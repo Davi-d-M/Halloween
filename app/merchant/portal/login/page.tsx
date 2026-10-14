@@ -125,7 +125,7 @@ export default function MarketSellerLoginPage() {
       const { error: verifyError } = await marketSupabase.auth.verifyOtp({
         phone: phone.trim(),
         token: code.trim(),
-        type: 'sms'
+        type: 'phone_change'
       });
       if (verifyError) throw verifyError;
       setMessage('Phone verified. Continue to your seller application or Merchant Studio.');
