@@ -12,7 +12,7 @@ Standalone Midnight Market storefront and private merchant studio. The app uses 
 
 The private Merchant Studio is at `/market`; `/merchant/dashboard` and `/` redirect there. The customer storefront is separate at `/shop`. Seller application is at `/merchant/register`, and seller sign-in is at `/merchant/portal/login`. Seller entry points are not added to the customer storefront navigation.
 
-After applying the foundation SQL, apply [`supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql), [`supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql), and [`supabase/MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql), in that order. These enable editable/resubmittable product listings, category details and media, customer order requests, and verified seller contacts for central sales coordination.
+After applying the foundation SQL, apply [`supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql), [`supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql), [`supabase/MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql), and [`supabase/MIDNIGHT_MARKET_ADMIN_CONTROL_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_ADMIN_CONTROL_UPGRADE.sql), in that order. These enable editable/resubmittable product listings, category details and media, customer order requests, verified seller contacts, and audited Online Bar controls for listings and order fulfillment.
 
 ## Central control and data flow
 
