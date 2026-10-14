@@ -10,7 +10,9 @@ Standalone Midnight Market storefront and private merchant studio. The app uses 
 4. Configure Supabase Auth email confirmation and an SMS provider. Set the application URL and `/merchant/portal/login` as an allowed redirect URL.
 5. Run `npm install`, then `npm run dev`.
 
-The storefront is at `/market`; `/` redirects there. Public browsing does not require a customer account. Seller application is at `/merchant/register`, seller sign-in is at `/merchant/portal/login`, and the approved seller dashboard is at `/merchant/dashboard`. Seller entry points are not added to the public storefront navigation.
+The private Merchant Studio is at `/market`; `/merchant/dashboard` redirects there. The customer storefront is at `/shop` and `/` redirects to it. Seller application is at `/merchant/register`, and seller sign-in is at `/merchant/portal/login`. Seller entry points are not added to the public storefront navigation.
+
+After applying the foundation SQL, apply [`supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql) to enable editable/resubmittable product listings, product attributes, multiple photos, optional product video, SKUs, sale prices, and required moderation feedback on rejected listings. The merchant dashboard provides listing counts, product submission/editing, review status and customer price offers.
 
 ## Central control and data flow
 
@@ -18,4 +20,4 @@ The Halloween Market Desk remains in the Online Bar admin app at `/admin/market`
 
 The standalone repository intentionally does not copy the Online Bar admin session, admin APIs, or unrelated waitlist/customer code. Do not expose the service-role key to the browser; only server routes use it. Seller identities still live in the shared Supabase Auth directory, with a separate seller portal and browser storage key rather than a separate Supabase Auth project.
 
-Price agreements are not checkout: this release does not create orders, take payments, reserve inventory, or automatically notify buyers by email/SMS. See [`supabase/MIDNIGHT_MARKET_SETUP.md`](./supabase/MIDNIGHT_MARKET_SETUP.md) for the current limits and deployment requirements.
+Price agreements are not checkout: this release does not create orders, take payments, reserve inventory, or automatically notify buyers by email/SMS. Do not treat a price agreement as an order. Order fulfilment, sales analytics, payouts and refunds cannot be enabled until a checkout/payment flow and the associated data model are implemented. See [`supabase/MIDNIGHT_MARKET_SETUP.md`](./supabase/MIDNIGHT_MARKET_SETUP.md) for the current limits and deployment requirements.

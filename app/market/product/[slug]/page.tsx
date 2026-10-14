@@ -1,6 +1,6 @@
-import { MarketProductPage } from '../../market-pages';
+import { redirect } from 'next/navigation';
 
 export default async function MarketProductRoute({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return <MarketProductPage slug={slug} />;
+  redirect(`/shop/product/${slug}`);
 }

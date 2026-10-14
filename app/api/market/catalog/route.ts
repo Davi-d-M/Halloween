@@ -8,17 +8,22 @@ type CatalogProduct = {
   name: string;
   slug: string;
   description: string | null;
+  attributes: Record<string, string>;
+  delivery_information: string | null;
+  return_policy: string | null;
   merchant: { name: string; slug: string };
   category: { name: string; slug: string } | null;
   variants: Array<{
     id: string;
     size: string | null;
     color: string | null;
+    sku: string | null;
     price_minor: number;
+    sale_price_minor: number | null;
     currency: string;
     inventory: { quantity_available: number; quantity_reserved: number } | null;
   }>;
-  media: Array<{ storage_path: string; alt_text: string | null; sort_order: number }>;
+  media: Array<{ storage_path: string; media_type: 'image' | 'video'; alt_text: string | null; sort_order: number }>;
 };
 
 function getDatabase() {
@@ -54,11 +59,11 @@ export async function GET(request: Request) {
       .order('name'),
     (async () => {
       let query = database.from('mm_products').select(`
-        id, name, slug, description,
+        id, name, slug, description, attributes, delivery_information, return_policy,
         merchant:mm_merchants!inner(name, slug, status),
         category:mm_categories!inner(name, slug),
-        variants:mm_product_variants!inner(id, size, color, price_minor, currency, active, inventory:mm_inventory(quantity_available, quantity_reserved)),
-        media:mm_product_media(storage_path, alt_text, sort_order)
+        variants:mm_product_variants!inner(id, sku, size, color, price_minor, sale_price_minor, currency, active, inventory:mm_inventory(quantity_available, quantity_reserved)),
+        media:mm_product_media(storage_path, media_type, alt_text, sort_order)
       `)
         .eq('status', 'published')
         .eq('merchant.status', 'approved')
@@ -99,13 +104,15 @@ export async function GET(request: Request) {
         imageSigningFailed = true;
         return null;
       }
-      return { url: data.signedUrl, alt: item.alt_text || product.name };
+      return { url: data.signedUrl, alt: item.alt_text || product.name, mediaType: item.media_type };
     }));
     const variants = product.variants.map((variant) => ({
       id: variant.id,
       size: variant.size,
       color: variant.color,
       priceMinor: Number(variant.price_minor),
+      salePriceMinor: variant.sale_price_minor === null ? null : Number(variant.sale_price_minor),
+      sku: variant.sku,
       currency: variant.currency,
       inStock: Boolean(variant.inventory
         && variant.inventory.quantity_available > variant.inventory.quantity_reserved)
@@ -116,6 +123,9 @@ export async function GET(request: Request) {
       name: product.name,
       slug: product.slug,
       description: product.description,
+      attributes: product.attributes || {},
+      deliveryInformation: product.delivery_information,
+      returnPolicy: product.return_policy,
       merchant: product.merchant,
       category: product.category,
       variants,

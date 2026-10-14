@@ -11,6 +11,9 @@ type Product = {
   name: string;
   slug: string;
   description: string | null;
+  attributes: Record<string, string>;
+  deliveryInformation: string | null;
+  returnPolicy: string | null;
   merchant: { name: string; slug: string };
   category: { name: string; slug: string } | null;
   variants: Array<{
@@ -18,10 +21,11 @@ type Product = {
     size: string | null;
     color: string | null;
     priceMinor: number;
+    salePriceMinor: number | null;
     currency: string;
     inStock: boolean;
   }>;
-  images: Array<{ url: string; alt: string }>;
+  images: Array<{ url: string; alt: string; mediaType: 'image' | 'video' }>;
 };
 type Catalog = {
   categories: Category[];
@@ -75,12 +79,12 @@ function useCatalog(filters = '') {
 function MarketHeader() {
   return (
     <header className="mm-header">
-      <Link className="mm-brand" href="/market" aria-label="Midnight Market home">
+      <Link className="mm-brand" href="/shop" aria-label="Midnight Market home">
         MIDNIGHT <span>MARKET</span>
       </Link>
       <nav className="mm-nav" aria-label="Market navigation">
-        <Link href="/market">Discover</Link>
-        <Link href="/market#categories">Categories</Link>
+        <Link href="/shop">Discover</Link>
+        <Link href="/shop#categories">Categories</Link>
       </nav>
     </header>
   );
@@ -94,21 +98,23 @@ function ProductGrid({ products }: { products: Product[] }) {
   return (
     <div className="mm-product-grid">
       {products.map((product) => {
-        const prices = product.variants.map((variant) => variant.priceMinor);
-        const price = Math.min(...prices);
         const currency = product.variants[0]?.currency || 'KES';
         const inStock = product.variants.some((variant) => variant.inStock);
         return (
-          <Link className="mm-product-card" href={`/market/product/${product.slug}`} key={product.id}>
+          <Link className="mm-product-card" href={`/shop/product/${product.slug}`} key={product.id}>
             <div className="mm-product-image">
               {product.images[0]
-                ? <Image src={product.images[0].url} alt={product.images[0].alt} fill unoptimized sizes="(max-width: 800px) 50vw, 25vw" />
+                ? product.images[0].mediaType === 'video'
+                  ? <video src={product.images[0].url} muted playsInline aria-label={product.images[0].alt} />
+                  : <Image src={product.images[0].url} alt={product.images[0].alt} fill unoptimized sizes="(max-width: 800px) 50vw, 25vw" />
                 : <MoonStar aria-hidden="true" size={42} strokeWidth={1} />}
             </div>
             <h3>{product.name}</h3>
             <div className="mm-product-meta">{product.merchant.name}{product.category ? ` · ${product.category.name}` : ''}</div>
             <div className="mm-product-price">
-              {new Intl.NumberFormat('en-KE', { style: 'currency', currency }).format(price / 100)}
+              {new Intl.NumberFormat('en-KE', { style: 'currency', currency }).format(
+                Math.min(...product.variants.map((variant) => variant.salePriceMinor ?? variant.priceMinor)) / 100
+              )}
               {!inStock && <span className="mm-product-meta"> · Sold out</span>}
             </div>
           </Link>
@@ -315,7 +321,7 @@ export function MarketHomePage() {
           {categories.length > 0 && (
             <div className="mm-category-list">
               {categories.map((category) => (
-                <Link className="mm-category-pill" href={`/market/category/${category.slug}`} key={category.slug}>
+                <Link className="mm-category-pill" href={`/shop/category/${category.slug}`} key={category.slug}>
                   {category.name}
                 </Link>
               ))}
@@ -353,7 +359,7 @@ export function MarketCategoryPage({ slug }: { slug: string }) {
       <main className="mm-page">
         <div className="mm-section-heading">
           <div>
-            <Link className="mm-text-link" href="/market"><ArrowLeft size={14} /> Back to discover</Link>
+            <Link className="mm-text-link" href="/shop"><ArrowLeft size={14} /> Back to discover</Link>
             <div className="mm-eyebrow" style={{ marginTop: 24 }}>Midnight Market category</div>
             <h2>{category?.name || slug.replace(/-/g, ' ')}</h2>
             {category?.description && <p className="mm-product-meta">{category.description}</p>}
@@ -374,6 +380,8 @@ export function MarketProductPage({ slug }: { slug: string }) {
   const { products, loading, error } = useCatalog(`slug=${encodeURIComponent(slug)}`);
   const product = products[0];
   const [selectedVariant, setSelectedVariant] = useState('');
+  const [selectedImage, setSelectedImage] = useState(0);
+  useEffect(() => setSelectedImage(0), [product?.id]);
   const selected = useMemo(
     () => product?.variants.find((variant) => variant.id === selectedVariant) || product?.variants[0],
     [product, selectedVariant]
@@ -391,20 +399,38 @@ export function MarketProductPage({ slug }: { slug: string }) {
               ? <div className="mm-state">This piece is not available.</div>
               : (
                 <section className="mm-product-detail">
-                  <Link className="mm-text-link" href="/market"><ArrowLeft size={14} /> Back to the market</Link>
+                  <Link className="mm-text-link" href="/shop"><ArrowLeft size={14} /> Back to the market</Link>
                   <div className="mm-detail-grid">
+                    <div>
                     <div className="mm-product-image mm-detail-image">
-                      {product.images[0]
-                        ? <Image src={product.images[0].url} alt={product.images[0].alt} fill unoptimized sizes="(max-width: 800px) 100vw, 50vw" />
+                      {product.images[selectedImage]
+                        ? product.images[selectedImage].mediaType === 'video'
+                          ? <video src={product.images[selectedImage].url} controls aria-label={product.images[selectedImage].alt} />
+                          : <Image src={product.images[selectedImage].url} alt={product.images[selectedImage].alt} fill unoptimized sizes="(max-width: 800px) 100vw, 50vw" />
                         : <MoonStar aria-hidden="true" size={56} strokeWidth={1} />}
+                    </div>
+                    {product.images.length > 1 && <div className="mm-media-thumbnails">{product.images.map((media, index) => (
+                      <button key={media.url} type="button" aria-label={`Show product media ${index + 1}`} aria-pressed={selectedImage === index} onClick={() => setSelectedImage(index)}>
+                        {media.mediaType === 'video' ? <span>Video</span> : <Image src={media.url} alt="" width={74} height={68} unoptimized />}
+                      </button>
+                    ))}</div>}
                     </div>
                     <div>
                       <div className="mm-eyebrow">{product.category?.name || 'Independent design'}</div>
                       <h1>{product.name}</h1>
-                      <Link href={`/market/store/${product.merchant.slug}`} className="mm-text-link">
+                      <Link href={`/shop/store/${product.merchant.slug}`} className="mm-text-link">
                         <Store size={15} /> {product.merchant.name}
                       </Link>
                       <p className="mm-detail-description">{product.description || 'A distinctive find from a Midnight Market boutique.'}</p>
+                      {Object.entries(product.attributes || {}).filter(([, value]) => value).length > 0 && (
+                        <dl className="mm-product-attributes">
+                          {Object.entries(product.attributes).filter(([, value]) => value).map(([key, value]) => (
+                            <div key={key}><dt>{key.replace(/_/g, ' ')}</dt><dd>{value}</dd></div>
+                          ))}
+                        </dl>
+                      )}
+                      {product.deliveryInformation && <p className="mm-product-meta"><strong>Delivery:</strong> {product.deliveryInformation}</p>}
+                      {product.returnPolicy && <p className="mm-product-meta"><strong>Returns:</strong> {product.returnPolicy}</p>}
                       {product.variants.length > 1 && (
                         <label className="mm-variant-label">
                           Choose a size or colour
@@ -419,7 +445,8 @@ export function MarketProductPage({ slug }: { slug: string }) {
                       )}
                       {selected && (
                         <div className="mm-product-price mm-detail-price">
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: selected.currency }).format(selected.priceMinor / 100)}
+                          {selected.salePriceMinor !== null && <del className="mm-original-price">{new Intl.NumberFormat('en-KE', { style: 'currency', currency: selected.currency }).format(selected.priceMinor / 100)}</del>}
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: selected.currency }).format((selected.salePriceMinor ?? selected.priceMinor) / 100)}
                         </div>
                       )}
                       <div className="mm-product-meta">{selected?.inStock ? 'Available from this boutique' : 'Currently sold out'}</div>
@@ -445,7 +472,7 @@ export function MarketStorePage({ slug }: { slug: string }) {
       <main className="mm-page">
         <div className="mm-section-heading">
           <div>
-            <Link className="mm-text-link" href="/market"><ArrowLeft size={14} /> Back to discover</Link>
+            <Link className="mm-text-link" href="/shop"><ArrowLeft size={14} /> Back to discover</Link>
             <div className="mm-eyebrow" style={{ marginTop: 24 }}>Independent boutique</div>
             <h2>{merchant?.name || slug.replace(/-/g, ' ')}</h2>
           </div>

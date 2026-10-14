@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       })
       .eq('id', applicationId)
       .eq('user_id', auth.user.id)
-      .eq('status', 'information_requested')
+      .in('status', ['information_requested', 'rejected'])
       .select('id, business_name, requested_slug, contact_name, contact_email, contact_phone, business_description, status, review_note, submitted_at')
       .maybeSingle();
     if (updateError) {
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not resubmit your seller application.' }, { status: 503 });
     }
     if (!updated) {
-      return NextResponse.json({ error: 'This application is not waiting for more information.' }, { status: 409 });
+      return NextResponse.json({ error: 'This application is not eligible for resubmission.' }, { status: 409 });
     }
     return NextResponse.json({ application: updated }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
   }

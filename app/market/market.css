@@ -581,3 +581,230 @@
     grid-template-columns: 1fr;
   }
 }
+.mm-studio-card {
+  max-width: 1120px;
+}
+
+.mm-studio-card > h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(38px, 6vw, 68px);
+  letter-spacing: -.045em;
+  line-height: 1;
+  margin: 18px 0;
+}
+
+.mm-studio-card .mm-register-copy {
+  max-width: 740px;
+}
+
+.mm-studio-dashboard {
+  margin-top: 32px;
+}
+
+.mm-studio-stats {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 24px 0 40px;
+}
+
+.mm-studio-stats article {
+  align-items: flex-start;
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 128px;
+  padding: 18px;
+}
+
+.mm-studio-stats article svg {
+  color: var(--mm-accent);
+}
+
+.mm-studio-stats article span {
+  color: var(--mm-muted);
+  font-size: 12px;
+}
+
+.mm-studio-stats article strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.mm-studio-section {
+  border-top: 1px solid var(--mm-line);
+  padding-top: 26px;
+  scroll-margin-top: 24px;
+}
+
+.mm-studio-section .mm-section-heading {
+  margin-bottom: 18px;
+}
+
+.mm-studio-section .mm-section-heading h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 400;
+  margin: 10px 0;
+}
+
+.mm-studio-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mm-studio-actions .mm-button {
+  margin-top: 0;
+}
+
+.mm-studio-actions .mm-button-secondary {
+  color: var(--mm-accent) !important;
+}
+
+.mm-review-note {
+  background: color-mix(in srgb, var(--mm-accent) 7%, var(--mm-panel));
+  border-color: color-mix(in srgb, var(--mm-accent) 28%, var(--mm-line));
+  color: var(--mm-ink);
+  margin: 12px 0;
+  padding: 14px;
+}
+
+.mm-review-note strong {
+  color: var(--mm-accent);
+}
+
+.mm-retained-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mm-retained-photos figure {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.mm-retained-photos img {
+  border: 1px solid var(--mm-line);
+  border-radius: 4px;
+  height: 96px;
+  object-fit: cover;
+  width: 120px;
+}
+
+.mm-retained-photos video {
+  border: 1px solid var(--mm-line);
+  border-radius: 4px;
+  height: 96px;
+  object-fit: cover;
+  width: 120px;
+}
+
+.mm-product-image > video {
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+}
+
+.mm-media-thumbnails {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.mm-media-thumbnails button {
+  align-items: center;
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  border-radius: 4px;
+  color: var(--mm-muted);
+  display: flex;
+  flex: 0 0 auto;
+  height: 68px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  width: 74px;
+}
+
+.mm-media-thumbnails button[aria-pressed="true"] {
+  border: 2px solid var(--mm-accent);
+}
+
+.mm-media-thumbnails img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.mm-retained-photos button {
+  color: var(--mm-accent);
+  font-size: 11px;
+}
+
+.mm-product-attributes {
+  border-bottom: 1px solid var(--mm-line);
+  border-top: 1px solid var(--mm-line);
+  margin: 20px 0;
+}
+
+.mm-product-attributes > div {
+  border-bottom: 1px solid var(--mm-line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(110px, .7fr) 1fr;
+  padding: 10px 0;
+}
+
+.mm-product-attributes > div:last-child {
+  border-bottom: 0;
+}
+
+.mm-product-attributes dt {
+  color: var(--mm-muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.mm-product-attributes dd {
+  font-size: 13px;
+  margin: 0;
+}
+
+.mm-original-price {
+  color: var(--mm-muted);
+  font-size: 14px;
+  margin-right: 8px;
+}
+
+@media (max-width: 760px) {
+  .mm-studio-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mm-header .mm-nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 440px) {
+  .mm-studio-stats {
+    gap: 8px;
+  }
+
+  .mm-studio-stats article {
+    min-height: 112px;
+    padding: 12px;
+  }
+}

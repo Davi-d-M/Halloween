@@ -1,5 +1,5 @@
-import { MarketHomePage } from './market-pages';
+import MerchantDashboardPage from './studio-dashboard';
 
 export default function MarketPage() {
-  return <MarketHomePage />;
+  return <MerchantDashboardPage />;
 }

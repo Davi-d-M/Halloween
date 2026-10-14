@@ -116,25 +116,26 @@ export default function MerchantRegistrationPage() {
   return (
     <>
       <header className="mm-header">
-        <Link className="mm-brand" href="/market">MIDNIGHT <span>MARKET</span></Link>
-        <nav className="mm-nav"><Link href="/market">Discover</Link></nav>
+        <Link className="mm-brand" href="/shop">MIDNIGHT <span>MARKET</span></Link>
+        <nav className="mm-nav"><Link href="/shop">Discover</Link><Link href="/market">Merchant Studio</Link></nav>
       </header>
       <main className="mm-page mm-merchant-register">
-        <Link className="mm-text-link" href="/market"><ArrowLeft size={14} /> Back to Market</Link>
+        <Link className="mm-text-link" href="/shop"><ArrowLeft size={14} /> Back to Market</Link>
         <div className="mm-register-card">
           <div className="mm-eyebrow">Merchant Studio</div>
           <h1>Bring your boutique into the night.</h1>
           <p className="mm-register-copy">This private seller application uses a separate Market account. We confirm your email and phone before a shop can be approved to list products.</p>
           {loading
             ? <div className="mm-state">Checking your seller account…</div>
-            : application && application.status !== 'information_requested'
+            : application && !['information_requested', 'rejected'].includes(application.status)
               ? (
                 <div className="mm-state">
                   <Store size={22} />
                   <strong>{application.business_name}</strong>
                   <span>Application status: {application.status.replace(/_/g, ' ')}</span>
                   {application.review_note && <span>{application.review_note}</span>}
-                  {application.status === 'approved' && <Link className="mm-text-link" href="/merchant/dashboard">Open Merchant Studio</Link>}
+                  {application.status === 'approved' && <Link className="mm-text-link" href="/market">Open Merchant Studio</Link>}
+                  {application.status === 'rejected' && <span>You can update your details and submit this application again for review.</span>}
                 </div>
               )
               : !signedIn
@@ -152,6 +153,12 @@ export default function MerchantRegistrationPage() {
                       <strong>More information requested</strong>
                       <span>{application.review_note || 'Please update the details below and resubmit.'}</span>
                       <span>Your shop remains unavailable until the review is complete.</span>
+                    </div>
+                  )}
+                  {application?.status === 'rejected' && (
+                    <div className="mm-state" role="status">
+                      <strong>Update and reapply</strong>
+                      <span>{application.review_note || 'Update the details below and send a new application for review.'}</span>
                     </div>
                   )}
                   <form className="mm-form" onSubmit={submitApplication}>
