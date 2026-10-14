@@ -22,6 +22,7 @@ export default function MerchantRegistrationPage() {
   const [application, setApplication] = useState<Application | null>(null);
   const [form, setForm] = useState({ businessName: '', slug: '', contactName: '', contactEmail: '', contactPhone: '', description: '' });
   const [signedIn, setSignedIn] = useState(false);
+  const [accessToken, setAccessToken] = useState('');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +53,7 @@ export default function MerchantRegistrationPage() {
       }
       if (!active) return;
       setSignedIn(Boolean(accessToken));
+      setAccessToken(accessToken || '');
       if (!accessToken) {
         setLoading(false);
         return;
@@ -65,7 +67,7 @@ export default function MerchantRegistrationPage() {
         if (!response.ok) throw new Error(result.error || 'Could not load your application.');
         if (active) {
           setApplication(result.application || null);
-          if (result.application?.status === 'information_requested') {
+          if (result.application && ['information_requested', 'rejected'].includes(result.application.status)) {
             setForm({
               businessName: result.application.business_name,
               slug: result.application.requested_slug,
@@ -85,6 +87,43 @@ export default function MerchantRegistrationPage() {
     void loadApplication();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!accessToken || !application || !['submitted', 'under_review'].includes(application.status)) return;
+
+    let active = true;
+    let checking = false;
+    const checkApplication = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const response = await fetch('/api/market/merchant-application', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: 'no-store'
+        });
+        const result = await response.json() as { application?: Application | null; error?: string };
+        if (!response.ok) throw new Error(result.error || 'Could not refresh your seller application.');
+        const latestApplication = result.application;
+        if (!active || !latestApplication) return;
+        setApplication((current) => current?.status === latestApplication.status
+          && current.review_note === latestApplication.review_note
+          ? current
+          : latestApplication);
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : 'Could not refresh your seller application.');
+      } finally {
+        checking = false;
+      }
+    };
+
+    const interval = window.setInterval(() => void checkApplication(), 15_000);
+    window.addEventListener('focus', checkApplication);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', checkApplication);
+    };
+  }, [accessToken, application]);
 
   async function submitApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -258,6 +258,44 @@ export default function MerchantDashboardPage() {
     return () => window.clearInterval(interval);
   }, [accessToken, loadOrders]);
 
+  useEffect(() => {
+    if (!accessToken || !application || !['submitted', 'under_review'].includes(application.status)) return;
+
+    let active = true;
+    let checking = false;
+    const checkApproval = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const response = await fetch('/api/market/merchant-application', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: 'no-store'
+        });
+        const result = await response.json() as { application?: Application | null; error?: string };
+        if (!response.ok) throw new Error(result.error || 'Could not refresh your seller application.');
+        if (!active || !result.application) return;
+        const latestApplication = result.application;
+        setApplication((current) => current?.status === latestApplication.status
+          && current.review_note === latestApplication.review_note
+          ? current
+          : latestApplication);
+        if (latestApplication.status === 'approved') window.location.reload();
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : 'Could not refresh your seller application.');
+      } finally {
+        checking = false;
+      }
+    };
+
+    const interval = window.setInterval(() => void checkApproval(), 15_000);
+    window.addEventListener('focus', checkApproval);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', checkApproval);
+    };
+  }, [accessToken, application]);
+
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     setImages(Array.from(event.target.files || []));
   }
