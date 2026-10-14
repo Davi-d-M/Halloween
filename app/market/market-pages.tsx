@@ -1,0 +1,462 @@
+'use client';
+
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { ArrowLeft, ArrowRight, Handshake, MoonStar, Store } from 'lucide-react';
+
+type Category = { name: string; slug: string; description: string | null };
+type Product = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  merchant: { name: string; slug: string };
+  category: { name: string; slug: string } | null;
+  variants: Array<{
+    id: string;
+    size: string | null;
+    color: string | null;
+    priceMinor: number;
+    currency: string;
+    inStock: boolean;
+  }>;
+  images: Array<{ url: string; alt: string }>;
+};
+type Catalog = {
+  categories: Category[];
+  products: Product[];
+  campaign?: { title: string; message: string } | null;
+};
+
+type OfferThread = {
+  id: string;
+  status: string;
+  latest_amount_minor: number;
+  listed_price_minor: number;
+  accepted_amount_minor: number | null;
+  expires_at: string;
+  product: { name: string; slug: string };
+  merchant: { name: string };
+  variant: { size: string | null; color: string | null };
+  messages: Array<{ actor: string; action: string; amount_minor: number | null; message: string | null; created_at: string }>;
+};
+
+function useCatalog(filters = '') {
+  const [catalog, setCatalog] = useState<Catalog>({ categories: [], products: [], campaign: null });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    fetch(`/api/market/catalog${filters ? `?${filters}` : ''}`, {
+      cache: 'no-store',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        const result = await response.json() as Catalog & { error?: string };
+        if (!response.ok) throw new Error(result.error || 'The Market catalog could not be loaded.');
+        setCatalog(result);
+      })
+      .catch((cause: unknown) => {
+        if (cause instanceof Error && cause.name === 'AbortError') return;
+        setError(cause instanceof Error ? cause.message : 'The Market catalog could not be loaded.');
+      })
+      .finally(() => setLoading(false));
+
+    return () => controller.abort();
+  }, [filters]);
+
+  return { ...catalog, loading, error };
+}
+
+function MarketHeader() {
+  return (
+    <header className="mm-header">
+      <Link className="mm-brand" href="/market" aria-label="Midnight Market home">
+        MIDNIGHT <span>MARKET</span>
+      </Link>
+      <nav className="mm-nav" aria-label="Market navigation">
+        <Link href="/market">Discover</Link>
+        <Link href="/market#categories">Categories</Link>
+      </nav>
+    </header>
+  );
+}
+
+function ProductGrid({ products }: { products: Product[] }) {
+  if (products.length === 0) {
+    return <div className="mm-state">New independent boutiques are joining. Check back soon.</div>;
+  }
+
+  return (
+    <div className="mm-product-grid">
+      {products.map((product) => {
+        const prices = product.variants.map((variant) => variant.priceMinor);
+        const price = Math.min(...prices);
+        const currency = product.variants[0]?.currency || 'KES';
+        const inStock = product.variants.some((variant) => variant.inStock);
+        return (
+          <Link className="mm-product-card" href={`/market/product/${product.slug}`} key={product.id}>
+            <div className="mm-product-image">
+              {product.images[0]
+                ? <Image src={product.images[0].url} alt={product.images[0].alt} fill unoptimized sizes="(max-width: 800px) 50vw, 25vw" />
+                : <MoonStar aria-hidden="true" size={42} strokeWidth={1} />}
+            </div>
+            <h3>{product.name}</h3>
+            <div className="mm-product-meta">{product.merchant.name}{product.category ? ` · ${product.category.name}` : ''}</div>
+            <div className="mm-product-price">
+              {new Intl.NumberFormat('en-KE', { style: 'currency', currency }).format(price / 100)}
+              {!inStock && <span className="mm-product-meta"> · Sold out</span>}
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+function MarketFooter() {
+  return (
+    <footer className="mm-footer">
+      Midnight Market — independent boutiques and after-dark style.
+    </footer>
+  );
+}
+
+function ProductOfferPanel({ product, variant }: { product: Product; variant: Product['variants'][number] }) {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', amount: '', message: '' });
+  const [offerId, setOfferId] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [offer, setOffer] = useState<OfferThread | null>(null);
+  const [counterAmount, setCounterAmount] = useState('');
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const loadOffer = useCallback(async (id: string, token: string) => {
+    const response = await fetch('/api/market/offers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'lookup', offerId: id, accessToken: token }),
+      cache: 'no-store'
+    });
+    const result = await response.json() as { offer?: OfferThread; error?: string };
+    if (!response.ok || !result.offer) throw new Error(result.error || 'Could not load this offer.');
+    setOffer(result.offer);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(`mm-offer:${product.id}`);
+      if (!saved) return;
+      const credentials = JSON.parse(saved) as { offerId?: string; accessToken?: string };
+      if (!credentials.offerId || !credentials.accessToken) return;
+      setOfferId(credentials.offerId);
+      setAccessToken(credentials.accessToken);
+      void loadOffer(credentials.offerId, credentials.accessToken).catch((cause: unknown) => {
+        setError(cause instanceof Error ? cause.message : 'Could not load this offer.');
+      });
+    } catch {
+      setError('Offer tracking is unavailable in this browser session.');
+    }
+  }, [loadOffer, product.id]);
+
+  async function submitOffer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const amountMinor = Math.round(Number(form.amount) * 100);
+    setWorking(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch('/api/market/offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          productId: product.id,
+          variantId: variant.id,
+          buyerName: form.name,
+          buyerEmail: form.email,
+          buyerPhone: form.phone,
+          amountMinor,
+          message: form.message
+        })
+      });
+      const result = await response.json() as { offer?: { id: string }; accessToken?: string; error?: string };
+      if (!response.ok || !result.offer || !result.accessToken) throw new Error(result.error || 'Could not send your offer.');
+      setOfferId(result.offer.id);
+      setAccessToken(result.accessToken);
+      try {
+        sessionStorage.setItem(`mm-offer:${product.id}`, JSON.stringify({ offerId: result.offer.id, accessToken: result.accessToken }));
+      } catch {
+        setNotice('Your offer was sent, but this browser could not save its private tracking session. Keep this page open to follow it.');
+      }
+      await loadOffer(result.offer.id, result.accessToken);
+      setNotice((current) => current || 'Offer sent to the boutique. The amount is a request, not a confirmed sale.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not send your offer.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function respond(responseAction: 'accept' | 'counter' | 'decline') {
+    if (!offerId || !accessToken) return;
+    setWorking(true);
+    setError('');
+    setNotice('');
+    try {
+      const amountMinor = Math.round(Number(counterAmount) * 100);
+      const response = await fetch('/api/market/offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'respond',
+          offerId,
+          accessToken,
+          responseAction,
+          amountMinor: responseAction === 'counter' ? amountMinor : undefined
+        })
+      });
+      const result = await response.json() as { offer?: { status: string }; error?: string };
+      if (!response.ok || !result.offer) throw new Error(result.error || 'Could not update your offer.');
+      await loadOffer(offerId, accessToken);
+      setNotice(responseAction === 'accept'
+        ? 'You accepted the proposed price. This records interest only; checkout and payment are not enabled.'
+        : responseAction === 'counter'
+          ? 'Your counteroffer was sent to the boutique.'
+          : 'You declined this offer.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not update your offer.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <section className="mm-offer-panel">
+      <div className="mm-eyebrow"><Handshake size={15} /> Price conversation</div>
+      <h2>Make an offer</h2>
+      <p>Ask the boutique about a price. Offers expire after 14 days. No payment or order is created here.</p>
+      {offer ? (
+        <div className="mm-offer-thread">
+          <div className="mm-offer-state">Offer status: <strong>{offer.status.replace(/_/g, ' ')}</strong></div>
+          <ol>
+            {offer.messages.map((item, index) => (
+              <li key={`${item.created_at}-${index}`}>
+                <strong>{item.actor === 'buyer' ? 'You' : item.actor === 'admin' ? 'Market Operations' : 'Boutique'} · {item.action}</strong>
+                {item.amount_minor !== null && <span>KSh {(item.amount_minor / 100).toLocaleString('en-KE')}</span>}
+                {item.message && <p>{item.message}</p>}
+                <time>{new Date(item.created_at).toLocaleString()}</time>
+              </li>
+            ))}
+          </ol>
+          {offer.status === 'countered' && (
+            <div className="mm-offer-actions">
+              <button className="mm-button" type="button" disabled={working} onClick={() => void respond('accept')}>Accept counteroffer</button>
+              <label>Counteroffer (KSh)<input type="number" min="1" max={offer.listed_price_minor / 100} step="1" value={counterAmount} onChange={(event) => setCounterAmount(event.target.value)} /></label>
+              <button className="mm-button mm-button-secondary" type="button" disabled={working || !counterAmount} onClick={() => void respond('counter')}>Send counteroffer</button>
+              <button className="mm-text-link" type="button" disabled={working} onClick={() => void respond('decline')}>Decline</button>
+            </div>
+          )}
+          {offer.status === 'accepted' && <p className="mm-phase-note">This is a recorded price agreement only. Contact the boutique directly; the Market does not process checkout or payment.</p>}
+        </div>
+      ) : (
+        <form className="mm-form" onSubmit={submitOffer}>
+          <label>Your name<input required minLength={2} maxLength={160} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+          <label>Email<input required type="email" maxLength={254} autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+          <label>Phone (optional)<input type="tel" maxLength={40} autoComplete="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+          <label>Offer (KSh)<input required type="number" min="1" max={variant.priceMinor / 100} step="1" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
+          <label className="mm-form-wide">Note (optional)<textarea rows={3} maxLength={500} value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} /></label>
+          {error && <div className="mm-state mm-error mm-form-wide" role="alert">{error}</div>}
+          {notice && <div className="mm-state mm-form-wide" role="status">{notice}</div>}
+          <button className="mm-button mm-form-wide" type="submit" disabled={working}>{working ? 'Sending…' : 'Send price offer'}</button>
+        </form>
+      )}
+      {offer && (
+        <>
+          {error && <div className="mm-state mm-error" role="alert">{error}</div>}
+          {notice && <div className="mm-state" role="status">{notice}</div>}
+          <button className="mm-text-link" type="button" disabled={working} onClick={() => void loadOffer(offerId, accessToken)}>Refresh offer status</button>
+        </>
+      )}
+      <p className="mm-offer-privacy">Your email and phone are shared only with this boutique and Market Operations. Keep this browser session to view the private offer thread.</p>
+    </section>
+  );
+}
+
+export function MarketHomePage() {
+  const { categories, products, loading, error, campaign } = useCatalog();
+
+  return (
+    <>
+      <MarketHeader />
+      <main className="mm-page">
+        <section className="mm-hero">
+          <div>
+            <div className="mm-eyebrow">Independent style · Nairobi after dark</div>
+            <h1>{campaign?.title || <>Find your<br />after-dark.</>}</h1>
+            <p>{campaign?.message || 'Discover statement pieces, expressive accessories and independent boutiques — all in one place.'}</p>
+            <a className="mm-button" href="#new-arrivals">Explore the edit <ArrowRight size={15} /></a>
+          </div>
+          <div className="mm-hero-art" aria-hidden="true">✳</div>
+        </section>
+
+        <section id="categories">
+          <div className="mm-section-heading">
+            <div>
+              <div className="mm-eyebrow">Shop your mood</div>
+              <h2>Explore the market</h2>
+            </div>
+          </div>
+          {categories.length > 0 && (
+            <div className="mm-category-list">
+              {categories.map((category) => (
+                <Link className="mm-category-pill" href={`/market/category/${category.slug}`} key={category.slug}>
+                  {category.name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section id="new-arrivals">
+          <div className="mm-section-heading">
+            <div>
+              <div className="mm-eyebrow">Fresh from our boutiques</div>
+              <h2>Recently discovered</h2>
+            </div>
+          </div>
+          {error
+            ? <div className="mm-state mm-error" role="alert">{error}</div>
+            : loading
+              ? <div className="mm-state" role="status">Opening the market…</div>
+              : <ProductGrid products={products} />}
+        </section>
+
+        <MarketFooter />
+      </main>
+    </>
+  );
+}
+
+export function MarketCategoryPage({ slug }: { slug: string }) {
+  const { categories, products, loading, error } = useCatalog(`category=${encodeURIComponent(slug)}`);
+  const category = categories.find((item) => item.slug === slug);
+
+  return (
+    <>
+      <MarketHeader />
+      <main className="mm-page">
+        <div className="mm-section-heading">
+          <div>
+            <Link className="mm-text-link" href="/market"><ArrowLeft size={14} /> Back to discover</Link>
+            <div className="mm-eyebrow" style={{ marginTop: 24 }}>Midnight Market category</div>
+            <h2>{category?.name || slug.replace(/-/g, ' ')}</h2>
+            {category?.description && <p className="mm-product-meta">{category.description}</p>}
+          </div>
+        </div>
+        {error
+          ? <div className="mm-state mm-error" role="alert">{error}</div>
+          : loading
+            ? <div className="mm-state" role="status">Finding pieces…</div>
+            : <ProductGrid products={products} />}
+        <MarketFooter />
+      </main>
+    </>
+  );
+}
+
+export function MarketProductPage({ slug }: { slug: string }) {
+  const { products, loading, error } = useCatalog(`slug=${encodeURIComponent(slug)}`);
+  const product = products[0];
+  const [selectedVariant, setSelectedVariant] = useState('');
+  const selected = useMemo(
+    () => product?.variants.find((variant) => variant.id === selectedVariant) || product?.variants[0],
+    [product, selectedVariant]
+  );
+
+  return (
+    <>
+      <MarketHeader />
+      <main className="mm-page">
+        {error
+          ? <div className="mm-state mm-error" role="alert">{error}</div>
+          : loading
+            ? <div className="mm-state" role="status">Opening this piece…</div>
+            : !product
+              ? <div className="mm-state">This piece is not available.</div>
+              : (
+                <section className="mm-product-detail">
+                  <Link className="mm-text-link" href="/market"><ArrowLeft size={14} /> Back to the market</Link>
+                  <div className="mm-detail-grid">
+                    <div className="mm-product-image mm-detail-image">
+                      {product.images[0]
+                        ? <Image src={product.images[0].url} alt={product.images[0].alt} fill unoptimized sizes="(max-width: 800px) 100vw, 50vw" />
+                        : <MoonStar aria-hidden="true" size={56} strokeWidth={1} />}
+                    </div>
+                    <div>
+                      <div className="mm-eyebrow">{product.category?.name || 'Independent design'}</div>
+                      <h1>{product.name}</h1>
+                      <Link href={`/market/store/${product.merchant.slug}`} className="mm-text-link">
+                        <Store size={15} /> {product.merchant.name}
+                      </Link>
+                      <p className="mm-detail-description">{product.description || 'A distinctive find from a Midnight Market boutique.'}</p>
+                      {product.variants.length > 1 && (
+                        <label className="mm-variant-label">
+                          Choose a size or colour
+                          <select value={selected?.id || ''} onChange={(event) => setSelectedVariant(event.target.value)}>
+                            {product.variants.map((variant) => (
+                              <option key={variant.id} value={variant.id}>
+                                {[variant.size, variant.color].filter(Boolean).join(' / ') || 'Standard'}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {selected && (
+                        <div className="mm-product-price mm-detail-price">
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: selected.currency }).format(selected.priceMinor / 100)}
+                        </div>
+                      )}
+                      <div className="mm-product-meta">{selected?.inStock ? 'Available from this boutique' : 'Currently sold out'}</div>
+                      <p className="mm-phase-note">Online checkout is not enabled yet. Contact the boutique directly for this item.</p>
+                      {selected?.inStock && <ProductOfferPanel product={product} variant={selected} />}
+                    </div>
+                  </div>
+                </section>
+              )}
+        <MarketFooter />
+      </main>
+    </>
+  );
+}
+
+export function MarketStorePage({ slug }: { slug: string }) {
+  const { products, loading, error } = useCatalog(`store=${encodeURIComponent(slug)}`);
+  const merchant = products[0]?.merchant;
+
+  return (
+    <>
+      <MarketHeader />
+      <main className="mm-page">
+        <div className="mm-section-heading">
+          <div>
+            <Link className="mm-text-link" href="/market"><ArrowLeft size={14} /> Back to discover</Link>
+            <div className="mm-eyebrow" style={{ marginTop: 24 }}>Independent boutique</div>
+            <h2>{merchant?.name || slug.replace(/-/g, ' ')}</h2>
+          </div>
+        </div>
+        {error
+          ? <div className="mm-state mm-error" role="alert">{error}</div>
+          : loading
+            ? <div className="mm-state" role="status">Opening boutique…</div>
+            : <ProductGrid products={products} />}
+        <MarketFooter />
+      </main>
+    </>
+  );
+}
