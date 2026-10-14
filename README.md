@@ -12,7 +12,7 @@ Standalone Midnight Market storefront and private merchant studio. The app uses 
 
 The private Merchant Studio is at `/market`; `/merchant/dashboard` and `/` redirect there. The customer storefront is separate at `/shop`. Seller application is at `/merchant/register`, and seller sign-in is at `/merchant/portal/login`. Seller entry points are not added to the customer storefront navigation.
 
-After applying the foundation SQL, apply [`supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql) and then [`supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql). These enable editable/resubmittable product listings, category details and media, plus customer order requests that merchants can confirm and fulfil in the dashboard.
+After applying the foundation SQL, apply [`supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_STUDIO_UPGRADE.sql), [`supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_ORDERS_UPGRADE.sql), and [`supabase/MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql`](./supabase/MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql), in that order. These enable editable/resubmittable product listings, category details and media, customer order requests, and verified seller contacts for central sales coordination.
 
 ## Central control and data flow
 
