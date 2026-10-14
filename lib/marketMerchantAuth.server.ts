@@ -14,7 +14,13 @@ export function getMarketConfiguration() {
 
 export async function getMarketMerchantContext(request: Request) {
   const configuration = getMarketConfiguration();
-  if (!configuration) return { response: NextResponse.json({ error: 'Merchant services are not configured.' }, { status: 503 }) };
+  if (!configuration) {
+    return {
+      response: NextResponse.json({
+        error: 'Market server configuration is incomplete. Set the Supabase URL, public key, and server-only SUPABASE_SERVICE_ROLE_KEY.'
+      }, { status: 503 })
+    };
+  }
   const accessToken = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
   if (!accessToken) return { response: NextResponse.json({ error: 'Sign in to Merchant Studio.' }, { status: 401 }) };
 

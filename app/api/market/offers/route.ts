@@ -16,7 +16,11 @@ function isUuid(value: unknown): value is string {
 
 export async function POST(request: Request) {
   const configuration = getMarketConfiguration();
-  if (!configuration) return NextResponse.json({ error: 'Market offers are not configured.' }, { status: 503 });
+  if (!configuration) {
+    return NextResponse.json({
+      error: 'Market server configuration is incomplete. Set the Supabase URL, public key, and server-only SUPABASE_SERVICE_ROLE_KEY.'
+    }, { status: 503 });
+  }
   let body: Record<string, unknown>;
   try {
     const parsed: unknown = await request.json();

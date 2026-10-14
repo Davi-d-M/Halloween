@@ -396,6 +396,31 @@
   text-align: center;
 }
 
+.mm-config-state {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  line-height: 1.5;
+}
+
+.mm-config-state > strong {
+  color: var(--mm-ink);
+  font-size: 18px;
+}
+
+.mm-config-state .mm-studio-actions {
+  justify-content: center;
+  width: min(100%, 560px);
+}
+
+.mm-config-state .mm-button {
+  align-items: center;
+  flex: 1 1 220px;
+  justify-content: center;
+  min-height: 48px;
+  text-align: center;
+}
+
 .mm-error {
   border-color: color-mix(in srgb, var(--mm-accent) 45%, var(--mm-line));
   color: #a21d1d;
@@ -664,6 +689,17 @@
 
 .mm-studio-actions .mm-button-secondary {
   color: var(--mm-accent) !important;
+}
+
+@media (max-width: 560px) {
+  .mm-config-state {
+    padding: 20px;
+  }
+
+  .mm-config-state .mm-button {
+    flex-basis: 100%;
+    width: 100%;
+  }
 }
 
 .mm-review-note {

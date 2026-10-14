@@ -39,7 +39,9 @@ function getDatabase() {
 export async function GET(request: Request) {
   const database = getDatabase();
   if (!database) {
-    return NextResponse.json({ error: 'Midnight Market database access is not configured.' }, { status: 503 });
+    return NextResponse.json({
+      error: 'Market server configuration is incomplete. Set the server-only SUPABASE_SERVICE_ROLE_KEY to connect to the Midnight Market database.'
+    }, { status: 503 });
   }
 
   const parameters = new URL(request.url).searchParams;

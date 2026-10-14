@@ -209,7 +209,7 @@ export default function MerchantDashboardPage() {
         if (sessionError) throw sessionError;
         if (!active) return;
         if (!session?.access_token) {
-          setError('Sign in to access your seller account.');
+          setError(categoryError || 'Sign in to access your seller account.');
           return;
         }
         setAccessToken(session.access_token);
@@ -509,7 +509,7 @@ export default function MerchantDashboardPage() {
 
           {loading && <div className="mm-state">Opening Merchant Studio…</div>}
           {!loading && error && !accessToken && !application && (
-            <div className="mm-state">
+            <div className="mm-state mm-config-state" role="alert">
               <Store size={22} />
               <strong>Private seller workspace</strong>
               <span>{error}</span>
