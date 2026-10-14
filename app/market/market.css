@@ -604,7 +604,7 @@
 .mm-studio-stats {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 24px 0 40px;
 }
 
@@ -676,6 +676,70 @@
 
 .mm-review-note strong {
   color: var(--mm-accent);
+}
+
+.mm-order-request {
+  border: 1px solid var(--mm-line);
+  margin-top: 26px;
+  padding: clamp(18px, 4vw, 28px);
+}
+
+.mm-order-request h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 26px;
+  font-weight: 400;
+  margin: 10px 0;
+}
+
+.mm-order-request > p {
+  color: var(--mm-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.mm-order-request .mm-form {
+  margin-top: 18px;
+}
+
+.mm-merchant-orders {
+  display: grid;
+  gap: 14px;
+}
+
+.mm-merchant-order {
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.mm-merchant-order-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.mm-merchant-order-heading > div {
+  display: grid;
+  gap: 5px;
+}
+
+.mm-merchant-order-heading span,
+.mm-merchant-order p {
+  color: var(--mm-muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.mm-merchant-order h3 {
+  font-size: 18px;
+  margin: 4px 0 0;
+}
+
+.mm-merchant-order .mm-button {
+  margin: 0;
 }
 
 .mm-retained-photos {

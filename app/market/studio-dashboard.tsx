@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { BadgeCheck, Box, ImagePlus, LogOut, MessageSquareText, PackagePlus, Store } from 'lucide-react';
+import { BadgeCheck, Box, ClipboardList, ImagePlus, LogOut, MessageSquareText, PackagePlus, Store } from 'lucide-react';
 import { marketSupabase } from '@/lib/marketSupabaseClient';
 
 type Category = { name: string; slug: string };
@@ -44,6 +44,23 @@ type MerchantOffer = {
   messages: Array<{ actor: string; action: string; amount_minor: number | null; message: string | null; created_at: string }>;
 };
 type Application = { status: string; review_note: string | null; business_name: string };
+type MerchantOrder = {
+  id: string;
+  reference: string;
+  product_name: string;
+  variant_label: string;
+  quantity: number;
+  unit_price_minor: number;
+  total_minor: number;
+  currency: string;
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string | null;
+  buyer_note: string | null;
+  status: 'requested' | 'confirmed' | 'preparing' | 'ready' | 'fulfilled' | 'cancelled';
+  payment_status: 'unpaid' | 'paid';
+  created_at: string;
+};
 
 type ProductForm = {
   name: string;
@@ -114,6 +131,7 @@ const categoryFields: Record<string, Array<{ key: string; label: string; placeho
 export default function MerchantDashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<MerchantProduct[]>([]);
+  const [orders, setOrders] = useState<MerchantOrder[]>([]);
   const [offers, setOffers] = useState<MerchantOffer[]>([]);
   const [counterAmounts, setCounterAmounts] = useState<Record<string, string>>({});
   const [application, setApplication] = useState<Application | null>(null);
@@ -126,8 +144,10 @@ export default function MerchantDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  const [ordersError, setOrdersError] = useState('');
   const [message, setMessage] = useState('');
   const [workingOfferId, setWorkingOfferId] = useState<string | null>(null);
+  const [workingOrderId, setWorkingOrderId] = useState<string | null>(null);
   const listingCounts = useMemo(() => ({
     total: products.length,
     live: products.filter((product) => product.status === 'published').length,
@@ -137,12 +157,27 @@ export default function MerchantDashboardPage() {
 
   const loadOffers = useCallback(async (token: string) => {
     const response = await fetch('/api/market/merchant-offers', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: ['Bearer', token].join(' ') },
       cache: 'no-store'
     });
     const result = await response.json() as { offers?: MerchantOffer[]; error?: string };
     if (!response.ok) throw new Error(result.error || 'Could not load customer offers.');
     setOffers(result.offers || []);
+  }, []);
+
+  const loadOrders = useCallback(async (token: string) => {
+    const response = await fetch('/api/market/merchant-orders', {
+      headers: { Authorization: ['Bearer', token].join(' ') },
+      cache: 'no-store'
+    });
+    const result = await response.json() as { orders?: MerchantOrder[]; error?: string };
+    if (!response.ok) {
+      const message = result.error || 'Could not load your order requests.';
+      setOrdersError(message);
+      throw new Error(message);
+    }
+    setOrdersError('');
+    setOrders(result.orders || []);
   }, []);
 
   const loadProducts = useCallback(async (token: string) => {
@@ -151,7 +186,7 @@ export default function MerchantDashboardPage() {
       cache: 'no-store'
     });
     const result = await response.json() as { products?: MerchantProduct[]; error?: string };
-    if (!response.ok) throw new Error(result.error || 'Could not load your shop.');
+    if (!response.ok) throw new Error(result.error || 'Could not load your product listings.');
     setProducts(result.products || []);
   }, []);
 
@@ -181,6 +216,11 @@ export default function MerchantDashboardPage() {
         try {
           await loadProducts(session.access_token);
           await loadOffers(session.access_token);
+          try {
+            await loadOrders(session.access_token);
+          } catch {
+            if (active) setOrders([]);
+          }
           if (active && categoryError) setError(categoryError);
         } catch (cause) {
           const applicationResponse = await fetch('/api/market/merchant-application', {
@@ -206,7 +246,17 @@ export default function MerchantDashboardPage() {
     }
     void initialize();
     return () => { active = false; };
-  }, [loadOffers, loadProducts]);
+  }, [loadOffers, loadOrders, loadProducts]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    const interval = window.setInterval(() => {
+      void loadOrders(accessToken).catch((cause: unknown) => {
+        setOrdersError(cause instanceof Error ? cause.message : 'Could not refresh order requests.');
+      });
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [accessToken, loadOrders]);
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     setImages(Array.from(event.target.files || []));
@@ -414,22 +464,48 @@ export default function MerchantDashboardPage() {
     }
   }
 
+  async function updateOrder(order: MerchantOrder, status: Exclude<MerchantOrder['status'], 'requested'> | 'paid') {
+    if (!accessToken) return;
+    setWorkingOrderId(order.id);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch('/api/market/merchant-orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: ['Bearer', accessToken].join(' ') },
+        body: JSON.stringify({ orderId: order.id, status })
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'Could not update this order request.');
+      setMessage(`Order ${order.reference} updated: ${status.replace(/_/g, ' ')}.`);
+      await loadOrders(accessToken);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not update this order request.');
+    } finally {
+      setWorkingOrderId(null);
+    }
+  }
+
   return (
     <>
       <header className="mm-header">
         <Link className="mm-brand" href="/market">MIDNIGHT <span>MARKET</span> · STUDIO</Link>
         <nav className="mm-nav">
-          <a href="#listings">My listings</a>
-          <a href="#offers">Offers</a>
-          <Link href="/shop">Customer storefront</Link>
-          {accessToken && <button className="mm-text-link" type="button" onClick={() => void signOut()}><LogOut size={14} /> Sign out</button>}
+          {accessToken && (
+            <>
+              <a href="#orders">Orders</a>
+              <a href="#listings">My listings</a>
+              <a href="#offers">Customer offers</a>
+              <button className="mm-text-link" type="button" onClick={() => void signOut()}><LogOut size={14} /> Sign out</button>
+            </>
+          )}
         </nav>
       </header>
       <main className="mm-page mm-merchant-register">
         <div className="mm-register-card mm-studio-card">
           <div className="mm-eyebrow">Merchant Studio</div>
-          <h1>Run your boutique.</h1>
-          <p className="mm-register-copy">Manage your listings, keep stock current and respond to customer offers. New and edited listings go to Market Operations for approval before they appear in the customer storefront.</p>
+          <h1>Merchant dashboard.</h1>
+          <p className="mm-register-copy">Sign in to manage your products, customer enquiries and order fulfilment. Product listings are reviewed by Market Operations before they go live.</p>
 
           {loading && <div className="mm-state">Opening Merchant Studio…</div>}
           {!loading && error && !accessToken && !application && (
@@ -458,11 +534,69 @@ export default function MerchantDashboardPage() {
           {!loading && accessToken && !application && (
             <div className="mm-studio-dashboard">
               <div className="mm-studio-stats">
+                <article><ClipboardList size={20} /><span>New order requests</span><strong>{orders.filter((order) => order.status === 'requested').length}</strong></article>
                 <article><PackagePlus size={20} /><span>Total listings</span><strong>{listingCounts.total}</strong></article>
                 <article><BadgeCheck size={20} /><span>Live in Market</span><strong>{listingCounts.live}</strong></article>
                 <article><Box size={20} /><span>Under review</span><strong>{listingCounts.review}</strong></article>
                 <article><MessageSquareText size={20} /><span>Needs changes</span><strong>{listingCounts.changes}</strong></article>
               </div>
+              <section id="orders" className="mm-merchant-listings mm-studio-order-state">
+                <div className="mm-section-heading">
+                  <div><div className="mm-eyebrow">Orders & fulfilment</div><h2>Customer order requests</h2></div>
+                  <button className="mm-text-link" type="button" onClick={() => void loadOrders(accessToken).catch((cause: unknown) => {
+                    setOrdersError(cause instanceof Error ? cause.message : 'Could not refresh order requests.');
+                  })}>Refresh orders</button>
+                </div>
+                <p className="mm-phase-note">These are requests submitted from the customer catalog. They are not paid orders; confirm stock before arranging payment and delivery with the customer.</p>
+                {orders.length === 0
+                  ? <div className={ordersError ? 'mm-state mm-error' : 'mm-state'} role={ordersError ? 'alert' : undefined}>{ordersError || 'No customer order requests yet.'}</div>
+                  : <div className="mm-merchant-orders">
+                    {orders.map((order) => (
+                      <article className="mm-merchant-order" key={order.id}>
+                        <div className="mm-merchant-order-heading">
+                          <div><strong>{order.reference}</strong><span>{new Date(order.created_at).toLocaleString()}</span></div>
+                          <strong>{order.status.replace(/_/g, ' ')}</strong>
+                        </div>
+                        <h3>{order.product_name}</h3>
+                        <p>{order.variant_label} · Qty {order.quantity} · KSh {(order.total_minor / 100).toLocaleString('en-KE')}</p>
+                        <p className="mm-phase-note">Payment: {order.payment_status}{order.payment_status === 'unpaid' ? ' · contact customer to arrange payment' : ' · recorded by merchant'}</p>
+                        <div className="mm-offer-contact">
+                          {order.buyer_name} · <a href={`mailto:${encodeURIComponent(order.buyer_email)}`}>{order.buyer_email}</a>
+                          {order.buyer_phone && <> · <a href={`tel:${encodeURIComponent(order.buyer_phone)}`}>{order.buyer_phone}</a></>}
+                        </div>
+                        {order.buyer_note && <p>Customer note: {order.buyer_note}</p>}
+                        {order.status === 'requested' && (
+                          <div className="mm-offer-actions">
+                            <button className="mm-button" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'confirmed')}>Confirm request</button>
+                            <button className="mm-text-link" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'cancelled')}>Decline</button>
+                          </div>
+                        )}
+                        {['confirmed', 'preparing', 'ready'].includes(order.status) && order.payment_status === 'unpaid' && (
+                          <button className="mm-button mm-button-secondary" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'paid')}>Record payment received</button>
+                        )}
+                        {order.status === 'confirmed' && (
+                          <div className="mm-offer-actions">
+                            <button className="mm-button" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'preparing')}>Start fulfilment</button>
+                            <button className="mm-text-link" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'cancelled')}>Cancel request</button>
+                          </div>
+                        )}
+                        {order.status === 'preparing' && (
+                          <div className="mm-offer-actions">
+                            <button className="mm-button" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'ready')}>Mark ready</button>
+                            <button className="mm-text-link" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'cancelled')}>Cancel request</button>
+                          </div>
+                        )}
+                        {order.status === 'ready' && order.payment_status === 'paid' && (
+                          <div className="mm-offer-actions">
+                            <button className="mm-button" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'fulfilled')}>Mark fulfilled</button>
+                            <button className="mm-text-link" type="button" disabled={workingOrderId === order.id} onClick={() => void updateOrder(order, 'cancelled')}>Cancel request</button>
+                          </div>
+                        )}
+                        {order.status === 'ready' && order.payment_status === 'unpaid' && <p className="mm-phase-note">Record payment received before marking this request fulfilled.</p>}
+                      </article>
+                    ))}
+                  </div>}
+              </section>
               <section id="listing-form" className="mm-studio-section mm-studio-form">
                 <div className="mm-section-heading">
                   <div><div className="mm-eyebrow">{editingProduct ? 'Edit and resubmit' : 'Product catalogue'}</div><h2>{editingProduct ? `Update ${editingProduct.name}` : 'Add a product'}</h2></div>
@@ -520,13 +654,6 @@ export default function MerchantDashboardPage() {
             </div>
           )}
         </div>
-
-        {accessToken && !application && (
-          <section id="orders" className="mm-merchant-listings mm-studio-order-state">
-            <div className="mm-section-heading"><div><div className="mm-eyebrow">Orders & fulfilment</div><h2>Checkout is not enabled yet</h2></div></div>
-            <p>There are no paid Market orders to fulfil yet. Buyers can browse and negotiate a price, but an accepted offer does not create an order, take payment, reserve stock or count as earnings. Order tracking, refunds, payout history and sales analytics will only appear once a real checkout and payment flow is connected.</p>
-          </section>
-        )}
 
         {accessToken && !application && (
           <section id="offers" className="mm-merchant-listings">

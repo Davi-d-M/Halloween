@@ -294,6 +294,67 @@ function ProductOfferPanel({ product, variant }: { product: Product; variant: Pr
   );
 }
 
+function ProductOrderRequestPanel({ product, variant }: { product: Product; variant: Product['variants'][number] }) {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', quantity: '1', note: '' });
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
+  const [reference, setReference] = useState('');
+
+  async function submitOrderRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWorking(true);
+    setError('');
+    setReference('');
+    try {
+      const response = await fetch('/api/market/order-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: product.id,
+          variantId: variant.id,
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          quantity: Number(form.quantity),
+          note: form.note
+        })
+      });
+      const result = await response.json() as { order?: { reference: string }; error?: string };
+      if (!response.ok || !result.order) throw new Error(result.error || 'Could not send your order request.');
+      setReference(result.order.reference);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not send your order request.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <section className="mm-order-request">
+      <div className="mm-eyebrow">Request from boutique</div>
+      <h2>Request this item</h2>
+      <p>This sends an unpaid order request to the boutique. They must confirm availability and contact you to arrange payment and delivery.</p>
+      {reference ? (
+        <div className="mm-state" role="status">
+          <strong>Request sent · {reference}</strong>
+          <span>Your request is waiting for the boutique to confirm. No payment has been taken.</span>
+        </div>
+      ) : (
+        <form className="mm-form" onSubmit={submitOrderRequest}>
+          <label>Your name<input required minLength={2} maxLength={160} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+          <label>Email<input required type="email" maxLength={254} autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+          <label>Phone<input required type="tel" maxLength={40} autoComplete="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+          <label>Quantity<input required type="number" min="1" max="10" step="1" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} /></label>
+          <label className="mm-form-wide">Message for the boutique (optional)<textarea rows={3} maxLength={500} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
+          {error && <div className="mm-state mm-error mm-form-wide" role="alert">{error}</div>}
+          <button className="mm-button mm-form-wide" type="submit" disabled={working}>{working ? 'Sending request…' : 'Send order request'}</button>
+        </form>
+      )}
+      <p className="mm-offer-privacy">Your contact details are shared with this boutique and Market Operations to handle your request. This is not a paid order.</p>
+    </section>
+  );
+}
+
 export function MarketHomePage() {
   const { categories, products, loading, error, campaign } = useCatalog();
 
@@ -450,8 +511,12 @@ export function MarketProductPage({ slug }: { slug: string }) {
                         </div>
                       )}
                       <div className="mm-product-meta">{selected?.inStock ? 'Available from this boutique' : 'Currently sold out'}</div>
-                      <p className="mm-phase-note">Online checkout is not enabled yet. Contact the boutique directly for this item.</p>
-                      {selected?.inStock && <ProductOfferPanel product={product} variant={selected} />}
+                      {selected?.inStock && (
+                        <>
+                          <ProductOrderRequestPanel product={product} variant={selected} />
+                          <ProductOfferPanel product={product} variant={selected} />
+                        </>
+                      )}
                     </div>
                   </div>
                 </section>
