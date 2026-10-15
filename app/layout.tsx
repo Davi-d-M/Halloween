@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import SessionReplay, { SessionReplayConsent } from './session-replay';
 
 export const metadata: Metadata = {
   title: 'Midnight Market | Fashion After Dark',
@@ -17,7 +18,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <SessionReplay appName="Midnight Market" />
+        <SessionReplayConsent />
+      </body>
     </html>
   );
 }
