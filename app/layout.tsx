@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
-        <SessionReplay appName="Midnight Market" />
+        <SessionReplay />
         <SessionReplayConsent />
       </body>
     </html>

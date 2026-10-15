@@ -1,155 +1,202 @@
 'use client';
 
-import React from 'react';
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import { record } from 'rrweb';
 import { usePathname } from 'next/navigation';
-import posthog from 'posthog-js';
 
-const CONSENT_KEY = 'ob_user_consent';
+const CONSENT_KEY = 'ob_session_replay_consent';
+const SHARED_CONSENT_KEY = 'ob_user_consent';
+const SESSION_KEY = 'ob_first_party_replay_session:midnight-market';
 const EXCLUDED_PATHS = ['/admin', '/market', '/merchant', '/checkout', '/payment'];
+const MAX_EVENTS = 2500;
+const URL_FIELDS = new Set(['href', 'src', 'action', 'formaction', 'poster', 'xlink:href']);
 
-function hasAnalyticsConsent() {
+function cleanUrl(value: string) {
   try {
-    const consent: unknown = JSON.parse(localStorage.getItem(CONSENT_KEY) || 'null');
+    const url = new URL(value, window.location.origin);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    url.search = '';
+    url.hash = '';
+    return url.origin === window.location.origin ? url.pathname : `${url.origin}${url.pathname}`;
+  } catch {
+    return '';
+  }
+}
+
+function sanitizeReplayEvent(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeReplayEvent);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [
+    key,
+    URL_FIELDS.has(key.toLowerCase()) && typeof nested === 'string'
+      ? cleanUrl(nested)
+      : sanitizeReplayEvent(nested)
+  ]));
+}
+
+function consentEnabled() {
+  try {
+    const consent: unknown = JSON.parse(localStorage.getItem(SHARED_CONSENT_KEY) || 'null');
     return typeof consent === 'object' && consent !== null
       && 'analytics' in consent && consent.analytics === true
-      && localStorage.getItem('ob_session_replay_consent') === 'true';
+      && localStorage.getItem(CONSENT_KEY) === 'true';
   } catch {
     return false;
   }
 }
 
-function canRecordPath(pathname: string) {
-  return !EXCLUDED_PATHS.some(path => pathname === path || pathname.startsWith(`${path}/`));
+function excludedPath(pathname: string) {
+  return EXCLUDED_PATHS.some(path => pathname === path || pathname.startsWith(`${path}/`));
 }
 
-function hasSensitiveQuery() {
-  return [...new URLSearchParams(window.location.search).keys()]
-    .some(key => /token|email|phone|otp|password|secret|code|state/i.test(key));
+function hasQueryString() {
+  return window.location.search.length > 0;
+}
+
+function getSessionId() {
+  let id = sessionStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem(SESSION_KEY, id);
+  }
+  return id;
 }
 
 export function SessionReplayConsent() {
-  const [show, setShow] = React.useState(false);
-  const [hasSavedChoice, setHasSavedChoice] = React.useState(false);
+  const [show, setShow] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [enabled, setEnabled] = useState(false);
 
-  React.useEffect(() => {
-    const hasChoice = localStorage.getItem(CONSENT_KEY) !== null;
-    setHasSavedChoice(hasChoice);
-    setShow(!hasChoice);
+  useEffect(() => {
+    const consent = localStorage.getItem(SHARED_CONSENT_KEY);
+    setSaved(consent !== null);
+    setShow(consent === null);
+    setEnabled(consentEnabled());
   }, []);
 
-  function saveConsent(analytics: boolean) {
-    localStorage.setItem(CONSENT_KEY, JSON.stringify({
+  function saveChoice(allow: boolean) {
+    localStorage.setItem(SHARED_CONSENT_KEY, JSON.stringify({
       necessary: true,
-      analytics,
+      analytics: allow,
       personalization: false,
       marketing: false
     }));
-    localStorage.setItem('ob_session_replay_consent', String(analytics));
-    window.dispatchEvent(new Event('ob-consent-updated'));
+    localStorage.setItem(CONSENT_KEY, String(allow));
+    setEnabled(allow);
+    setSaved(true);
     setShow(false);
-    setHasSavedChoice(true);
+    window.dispatchEvent(new Event('ob-consent-updated'));
   }
-
-  const buttonStyle: React.CSSProperties = {
-    border: '1px solid #d9dce3',
-    borderRadius: 8,
-    padding: '9px 12px',
-    background: '#fff',
-    color: '#20212a',
-    cursor: 'pointer',
-    fontWeight: 700
-  };
 
   return (
     <>
       <button type="button" onClick={() => setShow(true)} style={{
-        position: 'fixed', right: 12, bottom: 12, zIndex: 80,
-        border: 0, borderRadius: 999, padding: '8px 12px',
-        background: '#20212a', color: '#fff', cursor: 'pointer',
-        fontSize: 12, fontWeight: 700
+        position: 'fixed', right: 12, bottom: 12, zIndex: 80, border: 0,
+        borderRadius: 999, padding: '8px 12px', background: '#20212a',
+        color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700
       }}>Privacy settings</button>
-      {show && (
-        <div role="dialog" aria-label="Privacy and analytics settings" style={{
-          position: 'fixed', inset: 0, zIndex: 1000, display: 'grid',
-          alignItems: 'end', background: 'rgba(15, 18, 28, .45)', padding: 16
-        }}>
-          <section style={{
-            width: 'min(100%, 640px)', margin: '0 auto', padding: 22,
-            borderRadius: 16, background: '#fff', color: '#20212a',
-            boxShadow: '0 20px 60px rgba(0,0,0,.2)'
-          }}>
-            <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Privacy and session replay</h2>
-            <p style={{ margin: '0 0 16px', fontSize: 14, lineHeight: 1.55 }}>
-              Optional analytics help us understand how the site works. If enabled, a masked session replay may record page interactions; form and password values are masked. You can change this choice any time in Privacy settings.
-            </p>
-            {hasSavedChoice && <p role="status" style={{ fontSize: 13 }}>Analytics and replay are currently {hasAnalyticsConsent() ? 'enabled' : 'disabled'}.</p>}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" style={buttonStyle} onClick={() => saveConsent(false)}>Decline analytics</button>
-              <button type="button" style={{ ...buttonStyle, background: '#212133', color: '#fff' }} onClick={() => saveConsent(true)}>Allow analytics</button>
-              {hasSavedChoice && <button type="button" style={buttonStyle} onClick={() => setShow(false)}>Close</button>}
-            </div>
-          </section>
-        </div>
-      )}
+      {show && <div role="dialog" aria-modal="true" aria-label="Privacy and session replay" style={{
+        position: 'fixed', inset: 0, zIndex: 1000, display: 'grid',
+        alignItems: 'end', background: 'rgba(15,18,28,.45)', padding: 16
+      }}>
+        <section style={{ width: 'min(100%,640px)', margin: '0 auto', padding: 22, borderRadius: 16, background: '#fff', color: '#20212a', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+          <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Privacy and session replay</h2>
+          <p style={{ margin: '0 0 16px', fontSize: 14, lineHeight: 1.55 }}>Optional masked session replays help us improve the site. Text and form values are masked, and private seller, checkout, and account areas are not recorded. You can change your choice here any time.</p>
+          {saved && <p role="status" style={{ fontSize: 13 }}>Session replay is currently {enabled ? 'enabled' : 'disabled'}.</p>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" onClick={() => saveChoice(false)} style={{ border: '1px solid #d9dce3', borderRadius: 8, padding: '9px 12px', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>Decline replay</button>
+            <button type="button" onClick={() => saveChoice(true)} style={{ border: 0, borderRadius: 8, padding: '9px 12px', background: '#212133', color: '#fff', cursor: 'pointer', fontWeight: 700 }}>Allow masked replay</button>
+            {saved && <button type="button" onClick={() => setShow(false)} style={{ border: '1px solid #d9dce3', borderRadius: 8, padding: '9px 12px', background: '#fff', cursor: 'pointer', fontWeight: 700 }}>Close</button>}
+          </div>
+        </section>
+      </div>}
     </>
   );
 }
 
-export default function SessionReplay({ appName }: { appName: string }) {
+export default function SessionReplay() {
   const pathname = usePathname();
-  const initialized = useRef(false);
-  const lastPage = useRef('');
-  const projectKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const apiHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
 
   useEffect(() => {
-    function syncRecording() {
-      if (!hasAnalyticsConsent()) {
-        if (initialized.current) {
-          posthog.stopSessionRecording();
-          posthog.opt_out_capturing();
-        }
-        return;
-      }
-      if (!projectKey) return;
+    if (!consentEnabled() || excludedPath(pathname) || hasQueryString()) return;
 
-      if (!initialized.current) {
-        initialized.current = true;
-        posthog.init(projectKey, {
-          api_host: apiHost,
-          autocapture: false,
-          capture_pageview: false,
-          capture_pageleave: true,
-          disable_session_recording: true,
-          session_recording: {
-            maskAllInputs: true,
-            maskTextSelector: '.ph-no-capture, [data-private], [data-sensitive]'
-          }
+    const sessionId = getSessionId();
+    let stopped = false;
+    let sending = false;
+    let count = 0;
+    const pending: unknown[] = [];
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    async function flush() {
+      if (sending || pending.length === 0) return;
+      sending = true;
+      const batch = pending.splice(0, 40);
+      try {
+        const response = await fetch('/api/session-replays', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, appName: 'midnight-market', pagePath: pathname, events: batch }),
+          keepalive: true
         });
-      } else {
-        posthog.opt_in_capturing();
-      }
-
-      if (!canRecordPath(pathname) || hasSensitiveQuery()) {
-        posthog.stopSessionRecording();
-        lastPage.current = '';
-        return;
-      }
-
-      posthog.startSessionRecording();
-      const page = pathname;
-      if (lastPage.current !== page) {
-        lastPage.current = page;
-        posthog.register({ app_name: appName });
-        posthog.capture('$pageview', { $current_url: `${window.location.origin}${pathname}`, app_name: appName });
+        if (!response.ok) throw new Error(`Replay upload failed (${response.status}).`);
+      } catch (error) {
+        console.error('[SessionReplay] Could not save replay batch:', error);
+        pending.unshift(...batch);
+      } finally {
+        sending = false;
+        if (pending.length && !retryTimer) retryTimer = setTimeout(() => {
+          retryTimer = undefined;
+          void flush();
+        }, 3000);
       }
     }
 
-    syncRecording();
-    window.addEventListener('ob-consent-updated', syncRecording);
-    return () => window.removeEventListener('ob-consent-updated', syncRecording);
-  }, [apiHost, appName, pathname, projectKey]);
+    let stop: (() => void) | undefined;
+    stop = record({
+      emit(event) {
+        if (stopped) return;
+        if (hasQueryString()) {
+          stopped = true;
+          stop?.();
+          void flush();
+          return;
+        }
+        if (count >= MAX_EVENTS) return;
+        count++;
+        pending.push(sanitizeReplayEvent(event));
+        if (pending.length >= 40) void flush();
+      },
+      maskAllInputs: true,
+      maskTextSelector: '*',
+      blockClass: 'session-replay-block',
+      ignoreClass: 'session-replay-ignore',
+      recordCanvas: false,
+      inlineStylesheet: false,
+      collectFonts: false
+    });
+    if (!stop) {
+      console.error('[SessionReplay] The recorder did not start.');
+      return;
+    }
+    const interval = setInterval(() => void flush(), 5000);
+    const onConsentChange = () => {
+      if (!consentEnabled()) {
+        stopped = true;
+        stop();
+        void flush();
+      }
+    };
+    window.addEventListener('ob-consent-updated', onConsentChange);
+
+    return () => {
+      stopped = true;
+      stop();
+      clearInterval(interval);
+      if (retryTimer) clearTimeout(retryTimer);
+      window.removeEventListener('ob-consent-updated', onConsentChange);
+      void flush();
+    };
+  }, [pathname]);
 
   return null;
 }
