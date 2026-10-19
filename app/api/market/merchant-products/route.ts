@@ -26,6 +26,12 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function isDateOnly(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 async function readForm(request: Request) {
   try {
     return await request.formData();
@@ -55,6 +61,8 @@ async function saveProductFromStorage(request: Request, context: Exclude<Awaited
   const sku = text('sku');
   const deliveryInformation = text('deliveryInformation');
   const returnPolicy = text('returnPolicy');
+  const availability = text('availability');
+  const estimatedAvailableOn = text('estimatedAvailableOn');
   const price = Number(body.price);
   const salePrice = body.salePrice === null || body.salePrice === '' ? null : Number(body.salePrice);
   const stock = Number(body.stock);
@@ -99,6 +107,11 @@ async function saveProductFromStorage(request: Request, context: Exclude<Awaited
     || size.length > 80 || color.length > 80 || sku.length > 100
     || deliveryInformation.length > 1000 || returnPolicy.length > 1000
     || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(categorySlug)
+    || !['available_now', 'planned', 'made_to_order'].includes(availability)
+    || (availability === 'planned' && stock !== 0)
+    || (availability !== 'planned' && Boolean(estimatedAvailableOn))
+    || (estimatedAvailableOn && !isDateOnly(estimatedAvailableOn))
+    || (estimatedAvailableOn && estimatedAvailableOn < new Date().toISOString().slice(0, 10))
     || !Number.isFinite(price) || !Number.isSafeInteger(Math.round(price * 100)) || price < 1 || price > 100000000
     || (salePrice !== null && (!Number.isFinite(salePrice) || salePrice < 1 || salePrice >= price))
     || !Number.isSafeInteger(stock) || stock < 0 || stock > 1000000
@@ -152,7 +165,7 @@ async function saveProductFromStorage(request: Request, context: Exclude<Awaited
     alt_text: item.altText,
     sort_order: index
   }));
-  const { data, error } = await context.database.rpc('mm_upsert_product_listing', {
+  const { data, error } = await context.database.rpc('mm_upsert_product_listing_with_availability', {
     p_user_id: context.user.id,
     p_product_id: updating ? productId : null,
     p_variant_id: updating ? variantId : null,
@@ -169,7 +182,9 @@ async function saveProductFromStorage(request: Request, context: Exclude<Awaited
     p_price_minor: Math.round(price * 100),
     p_sale_price_minor: salePrice === null ? null : Math.round(salePrice * 100),
     p_quantity: stock,
-    p_images: media
+    p_images: media,
+    p_availability_status: availability,
+    p_estimated_available_on: estimatedAvailableOn || null
   });
 
   if (error) {
@@ -180,6 +195,7 @@ async function saveProductFromStorage(request: Request, context: Exclude<Awaited
     if (error.code === '23505') return NextResponse.json({ error: 'That product name or SKU is already in use in your boutique.' }, { status: 409 });
     if (error.message.includes('Choose an active marketplace category')) return NextResponse.json({ error: 'Choose an available category.' }, { status: 400 });
     if (error.message.includes('reserved for orders')) return NextResponse.json({ error: error.message }, { status: 409 });
+    if (error.message.includes('valid availability state')) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error.message.includes('another boutique') || error.message.includes('approved merchant')) {
       return NextResponse.json({ error: 'This listing is not available to your merchant account.' }, { status: 403 });
     }
@@ -218,6 +234,8 @@ async function saveProduct(request: Request, updating: boolean) {
   const sku = String(form.get('sku') || '').trim();
   const deliveryInformation = String(form.get('deliveryInformation') || '').trim();
   const returnPolicy = String(form.get('returnPolicy') || '').trim();
+  const availability = String(form.get('availability') || 'available_now');
+  const estimatedAvailableOn = String(form.get('estimatedAvailableOn') || '').trim();
   const price = Number(form.get('price'));
   const salePriceValue = String(form.get('salePrice') || '').trim();
   const salePrice = salePriceValue ? Number(salePriceValue) : null;
@@ -257,6 +275,11 @@ async function saveProduct(request: Request, updating: boolean) {
     || size.length > 80 || color.length > 80 || sku.length > 100
     || deliveryInformation.length > 1000 || returnPolicy.length > 1000
     || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(categorySlug)
+    || !['available_now', 'planned', 'made_to_order'].includes(availability)
+    || (availability === 'planned' && stock !== 0)
+    || (availability !== 'planned' && Boolean(estimatedAvailableOn))
+    || (estimatedAvailableOn && !isDateOnly(estimatedAvailableOn))
+    || (estimatedAvailableOn && estimatedAvailableOn < new Date().toISOString().slice(0, 10))
     || !Number.isFinite(price) || !Number.isSafeInteger(Math.round(price * 100)) || price < 1 || price > 100000000
     || (salePrice !== null && (!Number.isFinite(salePrice) || salePrice < 1 || salePrice >= price))
     || !Number.isSafeInteger(stock) || stock < 0 || stock > 1000000
@@ -346,7 +369,7 @@ async function saveProduct(request: Request, updating: boolean) {
     media.push({ storage_path: storagePath, media_type: mediaType, alt_text: name, sort_order: media.length });
   }
 
-  const { data, error } = await context.database.rpc('mm_upsert_product_listing', {
+  const { data, error } = await context.database.rpc('mm_upsert_product_listing_with_availability', {
     p_user_id: context.user.id,
     p_product_id: updating ? productId : null,
     p_variant_id: updating ? variantId : null,
@@ -363,7 +386,9 @@ async function saveProduct(request: Request, updating: boolean) {
     p_price_minor: Math.round(price * 100),
     p_sale_price_minor: salePrice === null ? null : Math.round(salePrice * 100),
     p_quantity: stock,
-    p_images: media
+    p_images: media,
+    p_availability_status: availability,
+    p_estimated_available_on: estimatedAvailableOn || null
   });
 
   if (error) {
@@ -374,6 +399,7 @@ async function saveProduct(request: Request, updating: boolean) {
     if (error.code === '23505') return NextResponse.json({ error: 'That product name or SKU is already in use in your boutique.' }, { status: 409 });
     if (error.message.includes('Choose an active marketplace category')) return NextResponse.json({ error: 'Choose an available category.' }, { status: 400 });
     if (error.message.includes('reserved for orders')) return NextResponse.json({ error: error.message }, { status: 409 });
+    if (error.message.includes('valid availability state')) return NextResponse.json({ error: error.message }, { status: 400 });
     if (error.message.includes('another boutique') || error.message.includes('approved merchant')) {
       return NextResponse.json({ error: 'This listing is not available to your merchant account.' }, { status: 403 });
     }
@@ -401,12 +427,23 @@ export async function GET(request: Request) {
 
   const { data, error } = await context.database
     .from('mm_products')
-    .select('id, name, slug, description, attributes, delivery_information, return_policy, review_note, status, created_at, category:mm_categories(name, slug), variants:mm_product_variants(id, sku, size, color, price_minor, sale_price_minor, currency, inventory:mm_inventory(quantity_available, quantity_reserved)), media:mm_product_media(storage_path, media_type, alt_text, sort_order)')
+    .select('id, name, slug, description, availability_status, estimated_available_on, attributes, delivery_information, return_policy, review_note, status, created_at, category:mm_categories(name, slug), variants:mm_product_variants(id, sku, size, color, price_minor, sale_price_minor, currency, inventory:mm_inventory(quantity_available, quantity_reserved)), media:mm_product_media(storage_path, media_type, alt_text, sort_order)')
     .eq('merchant_id', context.merchantId)
     .order('created_at', { ascending: false });
   if (error) {
     console.error('[MerchantStudio] Could not load merchant listings:', error);
     return NextResponse.json({ error: 'Could not load your product listings.' }, { status: 503 });
+  }
+
+  const { data: interests, error: interestsError } = await context.database
+    .from('mm_product_interests')
+    .select('id, product_id, buyer_name, buyer_email, buyer_phone, buyer_note, created_at')
+    .eq('merchant_id', context.merchantId)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (interestsError) {
+    console.error('[MerchantStudio] Could not load product interest:', interestsError);
+    return NextResponse.json({ error: 'Could not load customer interest for your planned listings.' }, { status: 503 });
   }
 
   let imageSigningFailed = false;
@@ -432,7 +469,19 @@ export async function GET(request: Request) {
   if (imageSigningFailed) {
     return NextResponse.json({ error: 'One or more product photos could not be loaded.' }, { status: 503 });
   }
-  return NextResponse.json({ products }, { headers: { 'Cache-Control': 'private, no-store' } });
+  const productNames = new Map((data || []).map((product) => [product.id, product.name]));
+  const visibleInterests = (interests || []).map((interest) => ({
+    id: interest.id,
+    product_name: productNames.get(interest.product_id) || 'Product listing',
+    buyer_name: interest.buyer_name,
+    buyer_email: interest.buyer_email,
+    buyer_phone: interest.buyer_phone,
+    buyer_note: interest.buyer_note,
+    created_at: interest.created_at
+  }));
+  return NextResponse.json({ products, interests: visibleInterests }, {
+    headers: { 'Cache-Control': 'private, no-store' }
+  });
 }
 
 export async function POST(request: Request) {

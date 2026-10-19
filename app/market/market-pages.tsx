@@ -4,12 +4,15 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, ArrowRight, Handshake, MoonStar, Store } from 'lucide-react';
+import MarketLogo from './market-logo';
 
 type Category = { name: string; slug: string; description: string | null };
 type Product = {
   id: string;
   name: string;
   slug: string;
+  availabilityStatus: 'available_now' | 'planned' | 'made_to_order';
+  estimatedAvailableOn: string | null;
   description: string | null;
   attributes: Record<string, string>;
   deliveryInformation: string | null;
@@ -80,7 +83,8 @@ function MarketHeader() {
   return (
     <header className="mm-header">
       <Link className="mm-brand" href="/shop" aria-label="Midnight Market home">
-        MIDNIGHT <span>MARKET</span>
+        <MarketLogo className="mm-brand-mark" />
+        <span className="mm-brand-name">MIDNIGHT <span>MARKET</span></span>
       </Link>
       <nav className="mm-nav" aria-label="Market navigation">
         <Link href="/shop">Discover</Link>
@@ -100,6 +104,11 @@ function ProductGrid({ products }: { products: Product[] }) {
       {products.map((product) => {
         const currency = product.variants[0]?.currency || 'KES';
         const inStock = product.variants.some((variant) => variant.inStock);
+        const availabilityLabel = product.availabilityStatus === 'planned'
+          ? 'Planned · coming soon'
+          : product.availabilityStatus === 'made_to_order'
+            ? 'Made to order'
+            : inStock ? 'Available now' : 'Sold out';
         return (
           <Link className="mm-product-card" href={`/shop/product/${product.slug}`} key={product.id}>
             <div className="mm-product-image">
@@ -108,6 +117,7 @@ function ProductGrid({ products }: { products: Product[] }) {
                   ? <video src={product.images[0].url} muted playsInline aria-label={product.images[0].alt} />
                   : <Image src={product.images[0].url} alt={product.images[0].alt} fill unoptimized sizes="(max-width: 800px) 50vw, 25vw" />
                 : <MoonStar aria-hidden="true" size={42} strokeWidth={1} />}
+              <span className={`mm-availability-badge mm-availability-${product.availabilityStatus}`}>{availabilityLabel}</span>
             </div>
             <h3>{product.name}</h3>
             <div className="mm-product-meta">{product.merchant.name}{product.category ? ` · ${product.category.name}` : ''}</div>
@@ -115,7 +125,6 @@ function ProductGrid({ products }: { products: Product[] }) {
               {new Intl.NumberFormat('en-KE', { style: 'currency', currency }).format(
                 Math.min(...product.variants.map((variant) => variant.salePriceMinor ?? variant.priceMinor)) / 100
               )}
-              {!inStock && <span className="mm-product-meta"> · Sold out</span>}
             </div>
           </Link>
         );
@@ -127,7 +136,8 @@ function ProductGrid({ products }: { products: Product[] }) {
 function MarketFooter() {
   return (
     <footer className="mm-footer">
-      Midnight Market — independent boutiques and after-dark style.
+      <MarketLogo className="mm-footer-mark" />
+      <span>Midnight Market — independent boutiques and after-dark style.</span>
     </footer>
   );
 }
@@ -327,6 +337,7 @@ function ProductOrderRequestPanel({ product, variant }: { product: Product; vari
     } finally {
       setWorking(false);
     }
+
   }
 
   return (
@@ -351,6 +362,61 @@ function ProductOrderRequestPanel({ product, variant }: { product: Product; vari
         </form>
       )}
       <p className="mm-offer-privacy">Your contact details are shared with this boutique and Market Operations to handle your request. This is not a paid order.</p>
+    </section>
+  );
+}
+
+function ProductInterestPanel({ product }: { product: Product }) {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', note: '' });
+  const [contactConsent, setContactConsent] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
+  const [reference, setReference] = useState('');
+
+  async function submitInterest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWorking(true);
+    setError('');
+    try {
+      const response = await fetch('/api/market/product-interest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id, ...form, contactConsent })
+      });
+      const result = await response.json() as { interest?: { reference: string }; error?: string };
+      if (!response.ok || !result.interest) throw new Error(result.error || 'Could not register your interest.');
+      setReference(result.interest.reference);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not register your interest.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <section className="mm-order-request">
+      <div className="mm-eyebrow">{product.availabilityStatus === 'planned' ? 'Coming soon' : 'Made to order'}</div>
+      <h2>Register your interest</h2>
+      <p>{product.availabilityStatus === 'planned'
+        ? `This is a planned listing, not confirmed stock. ${product.estimatedAvailableOn ? `The merchant estimates ${new Date(`${product.estimatedAvailableOn}T00:00:00`).toLocaleDateString('en-KE')} for availability. ` : ''}Register interest and the boutique can follow up when plans are confirmed.`
+        : 'This item is made to order. Send an enquiry and the boutique can confirm its production time and terms before any order or payment.'}</p>
+      {reference ? (
+        <div className="mm-state" role="status">
+          <strong>Interest recorded · {reference}</strong>
+          <span>The boutique can contact you to discuss availability. This is not an order and no payment has been taken.</span>
+        </div>
+      ) : (
+        <form className="mm-form" onSubmit={submitInterest}>
+          <label>Your name<input required minLength={2} maxLength={160} autoComplete="name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+          <label>Email<input required type="email" maxLength={254} autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+          <label>Phone (optional)<input type="tel" maxLength={40} autoComplete="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+          <label className="mm-form-wide">Message (optional)<textarea rows={3} maxLength={500} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label>
+          <label className="mm-form-wide mm-interest-consent"><input type="checkbox" checked={contactConsent} onChange={(event) => setContactConsent(event.target.checked)} required /> I agree that this boutique and Market Operations may use my contact details to respond to this enquiry.</label>
+          {error && <div className="mm-state mm-error mm-form-wide" role="alert">{error}</div>}
+          <button className="mm-button mm-form-wide" type="submit" disabled={working}>{working ? 'Sending…' : 'Notify the boutique of my interest'}</button>
+        </form>
+      )}
+      <p className="mm-offer-privacy">Your contact details go to this boutique and Market Operations for this enquiry only. This is not a preorder; no payment or reservation is created.</p>
     </section>
   );
 }
@@ -510,8 +576,13 @@ export function MarketProductPage({ slug }: { slug: string }) {
                           {new Intl.NumberFormat('en-KE', { style: 'currency', currency: selected.currency }).format((selected.salePriceMinor ?? selected.priceMinor) / 100)}
                         </div>
                       )}
-                      <div className="mm-product-meta">{selected?.inStock ? 'Available from this boutique' : 'Currently sold out'}</div>
-                      {selected?.inStock && (
+                      <div className="mm-product-meta">{product.availabilityStatus === 'planned'
+                        ? 'Planned listing · not currently in stock'
+                        : product.availabilityStatus === 'made_to_order'
+                          ? 'Made to order · confirm terms with the boutique'
+                          : selected?.inStock ? 'Available from this boutique' : 'Currently sold out'}</div>
+                      {product.availabilityStatus !== 'available_now' && <ProductInterestPanel product={product} />}
+                      {product.availabilityStatus === 'available_now' && selected?.inStock && (
                         <>
                           <ProductOrderRequestPanel product={product} variant={selected} />
                           <ProductOfferPanel product={product} variant={selected} />

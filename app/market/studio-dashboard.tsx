@@ -5,12 +5,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { BadgeCheck, Box, ClipboardList, ImagePlus, LogOut, MessageSquareText, PackagePlus, Store } from 'lucide-react';
 import { marketSupabase } from '@/lib/marketSupabaseClient';
+import MarketLogo from './market-logo';
 
 type Category = { name: string; slug: string };
 type MerchantProduct = {
   id: string;
   name: string;
   slug: string;
+  availability_status: 'available_now' | 'planned' | 'made_to_order';
+  estimated_available_on: string | null;
   description: string | null;
   category: { name: string; slug: string } | null;
   attributes: Record<string, string>;
@@ -43,6 +46,15 @@ type MerchantOffer = {
   variant: { size: string | null; color: string | null };
   messages: Array<{ actor: string; action: string; amount_minor: number | null; message: string | null; created_at: string }>;
 };
+type ProductInterest = {
+  id: string;
+  product_name: string;
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string | null;
+  buyer_note: string | null;
+  created_at: string;
+};
 type Application = { status: string; review_note: string | null; business_name: string };
 type MerchantOrder = {
   id: string;
@@ -66,6 +78,8 @@ type ProductForm = {
   name: string;
   description: string;
   category: string;
+  availability: 'available_now' | 'planned' | 'made_to_order';
+  estimatedAvailableOn: string;
   price: string;
   salePrice: string;
   stock: string;
@@ -78,7 +92,7 @@ type ProductForm = {
 };
 
 const blankForm: ProductForm = {
-  name: '', description: '', category: '', price: '', salePrice: '', stock: '', sku: '',
+  name: '', description: '', category: '', availability: 'available_now', estimatedAvailableOn: '', price: '', salePrice: '', stock: '', sku: '',
   size: '', color: '', deliveryInformation: '', returnPolicy: '', attributes: {}
 };
 
@@ -103,6 +117,23 @@ const categoryFields: Record<string, Array<{ key: string; label: string; placeho
     { key: 'included_components', label: 'What is included', placeholder: 'List all included pieces' },
     { key: 'safety', label: 'Safety notes', placeholder: 'Relevant safety warnings' },
     { key: 'care', label: 'Care instructions', placeholder: 'Cleaning and storage' }
+  ],
+  'costume-packages': [
+    { key: 'included_components', label: 'Package contents', placeholder: 'List each included costume piece' },
+    { key: 'group_size', label: 'People included', placeholder: 'Number of people this set outfits' },
+    { key: 'fit', label: 'Sizes and fit', placeholder: 'List included sizes and measurements' },
+    { key: 'care', label: 'Care instructions', placeholder: 'Cleaning and storage' }
+  ],
+  'props-fx': [
+    { key: 'included_components', label: 'What is included', placeholder: 'List each prop or effect item' },
+    { key: 'material', label: 'Material', placeholder: 'Main materials' },
+    { key: 'safety', label: 'Safety notes', placeholder: 'Confirm this is a costume prop; include relevant safety guidance' }
+  ],
+  'party-decor': [
+    { key: 'dimensions', label: 'Dimensions', placeholder: 'Measurements in cm' },
+    { key: 'included_components', label: 'Pack contents', placeholder: 'List decorations and quantities' },
+    { key: 'power_requirements', label: 'Power requirements', placeholder: 'Battery or mains details, if applicable' },
+    { key: 'safety', label: 'Safety notes', placeholder: 'Relevant setup and use guidance' }
   ],
   'wigs-beauty': [
     { key: 'hair_length', label: 'Hair length', placeholder: 'Length in inches or centimetres' },
@@ -131,6 +162,7 @@ const categoryFields: Record<string, Array<{ key: string; label: string; placeho
 export default function MerchantDashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<MerchantProduct[]>([]);
+  const [productInterests, setProductInterests] = useState<ProductInterest[]>([]);
   const [orders, setOrders] = useState<MerchantOrder[]>([]);
   const [offers, setOffers] = useState<MerchantOffer[]>([]);
   const [counterAmounts, setCounterAmounts] = useState<Record<string, string>>({});
@@ -185,9 +217,10 @@ export default function MerchantDashboardPage() {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store'
     });
-    const result = await response.json() as { products?: MerchantProduct[]; error?: string };
+    const result = await response.json() as { products?: MerchantProduct[]; interests?: ProductInterest[]; error?: string };
     if (!response.ok) throw new Error(result.error || 'Could not load your product listings.');
     setProducts(result.products || []);
+    setProductInterests(result.interests || []);
   }, []);
 
   useEffect(() => {
@@ -386,6 +419,8 @@ export default function MerchantDashboardPage() {
           name: form.name,
           description: form.description,
           category: form.category,
+          availability: form.availability,
+          estimatedAvailableOn: form.estimatedAvailableOn || null,
           price: Number(form.price),
           salePrice: form.salePrice ? Number(form.salePrice) : null,
           stock: Number(form.stock),
@@ -447,6 +482,8 @@ export default function MerchantDashboardPage() {
       name: product.name,
       description: product.description || '',
       category: product.category?.slug || '',
+      availability: product.availability_status || 'available_now',
+      estimatedAvailableOn: product.estimated_available_on || '',
       price: variant ? String(variant.price_minor / 100) : '',
       salePrice: variant?.sale_price_minor ? String(variant.sale_price_minor / 100) : '',
       stock: variant?.inventory ? String(variant.inventory.quantity_available) : '0',
@@ -527,7 +564,10 @@ export default function MerchantDashboardPage() {
   return (
     <>
       <header className="mm-header">
-        <Link className="mm-brand" href="/market">MIDNIGHT <span>MARKET</span> · STUDIO</Link>
+        <Link className="mm-brand" href="/market">
+          <MarketLogo className="mm-brand-mark" />
+          <span className="mm-brand-name">MIDNIGHT <span>MARKET</span> · STUDIO</span>
+        </Link>
         <nav className="mm-nav">
           {accessToken && (
             <>
@@ -646,10 +686,26 @@ export default function MerchantDashboardPage() {
                 <option value="">Choose a category</option>
                 {categories.map((category) => <option key={category.slug} value={category.slug}>{category.name}</option>)}
               </select></label>
+              <label>Availability<select required value={form.availability} onChange={(event) => {
+                const availability = event.target.value as ProductForm['availability'];
+                setForm({
+                  ...form,
+                  availability,
+                  estimatedAvailableOn: availability === 'planned' ? form.estimatedAvailableOn : '',
+                  stock: availability === 'planned' ? '0' : form.stock
+                });
+              }}>
+                <option value="available_now">Available now · confirmed stock</option>
+                <option value="planned">Planned · not in stock yet</option>
+                <option value="made_to_order">Made to order · request only</option>
+              </select></label>
+              {form.availability === 'planned' && (
+                <label>Estimated availability date (optional)<input type="date" value={form.estimatedAvailableOn} onChange={(event) => setForm({ ...form, estimatedAvailableOn: event.target.value })} /></label>
+              )}
               <label>SKU (optional)<input maxLength={100} value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} /></label>
               <label>Regular price (KSh)<input required type="number" min="1" max="100000000" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></label>
               <label>Sale price (optional)<input type="number" min="1" max={Number(form.price) || undefined} step="0.01" value={form.salePrice} onChange={(event) => setForm({ ...form, salePrice: event.target.value })} /></label>
-              <label>Available stock<input required type="number" min="0" max="1000000" step="1" value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} /></label>
+              <label>{form.availability === 'planned' ? 'Current stock (must be zero)' : 'Available stock'}<input required type="number" min="0" max="1000000" step="1" disabled={form.availability === 'planned'} value={form.availability === 'planned' ? '0' : form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} /></label>
               <label>Size / measurements<input maxLength={80} value={form.size} onChange={(event) => setForm({ ...form, size: event.target.value })} /></label>
               <label>Colour<input maxLength={80} value={form.color} onChange={(event) => setForm({ ...form, color: event.target.value })} /></label>
               {categoryFields[form.category]?.map((field) => (
@@ -680,7 +736,7 @@ export default function MerchantDashboardPage() {
                   ))}
                 </div>
               )}
-              <p className="mm-phase-note mm-form-wide">Category-specific details help buyers compare jewellery, clothing, wigs, beauty, footwear and accessories. Editing a live item hides it until Market Operations reviews the update.</p>
+              <p className="mm-phase-note mm-form-wide">Planned and made-to-order listings collect interest only; they cannot be ordered or paid for. Available-now listings require confirmed stock. Every new or edited listing stays hidden until Market Operations approves it.</p>
               {error && <div className="mm-state mm-error mm-form-wide" role="alert">{error}</div>}
               {message && <div className="mm-state mm-form-wide" role="status">{message}</div>}
               <div className="mm-studio-actions mm-form-wide">
@@ -692,6 +748,31 @@ export default function MerchantDashboardPage() {
             </div>
           )}
         </div>
+
+        {accessToken && !application && (
+          <section id="product-interest" className="mm-merchant-listings">
+            <div className="mm-section-heading">
+              <div><div className="mm-eyebrow">Coming soon & custom requests</div><h2>Product interest</h2></div>
+              <button className="mm-text-link" type="button" onClick={() => void loadProducts(accessToken).catch((cause: unknown) => {
+                setError(cause instanceof Error ? cause.message : 'Could not refresh product interest.');
+              })}>Refresh interest</button>
+            </div>
+            {productInterests.length === 0
+              ? <div className="mm-state">No customer interest yet. Planned and made-to-order listings collect enquiries here without taking payment.</div>
+              : <div className="mm-offer-cards">{productInterests.map((interest) => (
+                <article className="mm-offer-card" key={interest.id}>
+                  <div className="mm-offer-card-heading">
+                    <div><strong>{interest.product_name}</strong><span>{new Date(interest.created_at).toLocaleString('en-KE')}</span></div>
+                  </div>
+                  <div className="mm-offer-contact">
+                    {interest.buyer_name} · <a href={`mailto:${encodeURIComponent(interest.buyer_email)}`}>{interest.buyer_email}</a>
+                    {interest.buyer_phone && <> · <a href={`tel:${encodeURIComponent(interest.buyer_phone)}`}>{interest.buyer_phone}</a></>}
+                  </div>
+                  {interest.buyer_note && <p className="mm-product-meta">{interest.buyer_note}</p>}
+                </article>
+              ))}</div>}
+          </section>
+        )}
 
         {accessToken && !application && (
           <section id="offers" className="mm-merchant-listings">
@@ -741,6 +822,7 @@ export default function MerchantDashboardPage() {
                   <div className="mm-product-image">{product.images[0] ? <Image src={product.images[0].url} alt={product.images[0].alt} fill unoptimized sizes="(max-width: 800px) 50vw, 25vw" /> : <ImagePlus size={40} />}</div>
                   <h3>{product.name}</h3>
                   <div className="mm-product-meta">Status: {product.status.replace(/_/g, ' ')}{product.category ? ` · ${product.category.name}` : ''}</div>
+                  <div className="mm-product-meta">Availability: {product.availability_status.replace(/_/g, ' ')}{product.estimated_available_on ? ` · Est. ${product.estimated_available_on}` : ''}</div>
                   {product.variants[0] && <div className="mm-product-price">KSh {(product.variants[0].price_minor / 100).toLocaleString('en-KE')}</div>}
                   {product.review_note && <div className="mm-review-note"><strong>Changes requested:</strong> {product.review_note}</div>}
                   <button className="mm-button mm-button-secondary" type="button" onClick={() => editProduct(product)}>Edit listing</button>

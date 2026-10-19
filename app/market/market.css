@@ -28,25 +28,38 @@
 
 .mm-header {
   align-items: center;
-  border-bottom: 1px solid var(--mm-line);
+  background: color-mix(in srgb, var(--mm-panel) 88%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--mm-line) 75%, transparent);
+  box-shadow: 0 10px 30px rgb(39 29 53 / 4%);
   display: flex;
   gap: 24px;
   justify-content: space-between;
   margin: 0 auto;
   max-width: 1440px;
   padding: 22px clamp(20px, 5vw, 72px);
+  position: relative;
+  z-index: 1;
 }
 
 .mm-brand {
+  align-items: center;
   color: var(--mm-ink);
+  display: inline-flex;
   font-size: 15px;
   font-weight: 800;
+  gap: 12px;
   letter-spacing: .2em;
   white-space: nowrap;
 }
 
-.mm-brand span {
+.mm-brand-name > span {
   color: var(--mm-accent);
+}
+
+.mm-brand-mark {
+  filter: drop-shadow(0 5px 12px rgb(39 29 53 / 18%));
+  height: 42px;
+  width: 42px;
 }
 
 .mm-nav {
@@ -80,13 +93,14 @@
     radial-gradient(ellipse at 75% 42%, color-mix(in srgb, var(--mm-accent) 11%, transparent), transparent 38%),
     linear-gradient(120deg, var(--mm-panel) 10%, var(--mm-bg) 75%);
   border: 1px solid var(--mm-line);
-  border-radius: 8px;
+  border-radius: 16px;
   display: grid;
   grid-template-columns: 1.2fr .8fr;
   margin-top: 32px;
   min-height: 410px;
   overflow: hidden;
   padding: clamp(30px, 7vw, 88px);
+  position: relative;
 }
 
 .mm-eyebrow {
@@ -123,6 +137,15 @@
   justify-content: center;
   opacity: .8;
   text-shadow: 0 0 75px color-mix(in srgb, var(--mm-accent) 28%, transparent);
+}
+
+.mm-hero-art::before {
+  border: 1px solid color-mix(in srgb, var(--mm-accent) 20%, transparent);
+  border-radius: 50%;
+  content: "";
+  height: min(30vw, 310px);
+  position: absolute;
+  width: min(30vw, 310px);
 }
 
 .mm-button {
@@ -359,6 +382,33 @@
   position: relative;
 }
 
+.mm-availability-badge {
+  background: #193a32;
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: 999px;
+  bottom: 12px;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  left: 12px;
+  letter-spacing: .08em;
+  padding: 8px 11px;
+  position: absolute;
+  text-transform: uppercase;
+}
+
+.mm-availability-planned {
+  background: #68451a;
+}
+
+.mm-availability-made_to_order {
+  background: #56355f;
+}
+
+.mm-availability-available_now {
+  background: #193a32;
+}
+
 .mm-product-image img {
   height: 100%;
   object-fit: cover;
@@ -427,11 +477,19 @@
 }
 
 .mm-footer {
+  align-items: center;
   border-top: 1px solid var(--mm-line);
   color: var(--mm-muted);
+  display: flex;
   font-size: 11px;
+  gap: 12px;
   margin-top: 72px;
   padding: 24px 0 0;
+}
+
+.mm-footer-mark {
+  height: 32px;
+  width: 32px;
 }
 
 .mm-product-detail {
@@ -735,6 +793,25 @@
 
 .mm-order-request .mm-form {
   margin-top: 18px;
+}
+
+.mm-interest-consent {
+  align-items: start;
+  display: grid !important;
+  font-size: 11px !important;
+  grid-template-columns: 20px minmax(0, 1fr);
+  letter-spacing: 0 !important;
+  line-height: 1.6;
+  text-transform: none !important;
+}
+
+.mm-interest-consent input {
+  accent-color: var(--mm-accent);
+  height: 18px;
+  margin: 1px 0 0;
+  min-height: 18px;
+  padding: 0;
+  width: 18px;
 }
 
 .mm-merchant-orders {

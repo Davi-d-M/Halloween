@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   });
   if (error) {
     if (error.message.includes('no longer available') || error.message.includes('not currently accepting')
-      || error.message.includes('not enough stock')) {
+      || error.message.includes('not enough stock') || error.message.includes('not available for order requests')) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     if (error.message.includes('Check your contact')) {

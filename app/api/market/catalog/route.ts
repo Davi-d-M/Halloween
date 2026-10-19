@@ -7,6 +7,8 @@ type CatalogProduct = {
   id: string;
   name: string;
   slug: string;
+  availability_status: 'available_now' | 'planned' | 'made_to_order';
+  estimated_available_on: string | null;
   description: string | null;
   attributes: Record<string, string>;
   delivery_information: string | null;
@@ -61,7 +63,7 @@ export async function GET(request: Request) {
       .order('name'),
     (async () => {
       let query = database.from('mm_products').select(`
-        id, name, slug, description, attributes, delivery_information, return_policy,
+        id, name, slug, description, availability_status, estimated_available_on, attributes, delivery_information, return_policy,
         merchant:mm_merchants!inner(name, slug, status),
         category:mm_categories!inner(name, slug),
         variants:mm_product_variants!inner(id, sku, size, color, price_minor, sale_price_minor, currency, active, inventory:mm_inventory(quantity_available, quantity_reserved)),
@@ -124,6 +126,8 @@ export async function GET(request: Request) {
       id: product.id,
       name: product.name,
       slug: product.slug,
+      availabilityStatus: product.availability_status,
+      estimatedAvailableOn: product.estimated_available_on,
       description: product.description,
       attributes: product.attributes || {},
       deliveryInformation: product.delivery_information,
