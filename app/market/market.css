@@ -70,6 +70,33 @@
   gap: clamp(12px, 2.5vw, 36px);
 }
 
+.mm-nav a {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.mm-header-count {
+  align-items: center;
+  background: var(--mm-soft);
+  border-radius: 999px;
+  color: var(--mm-ink);
+  display: inline-flex;
+  font-size: 9px;
+  height: 19px;
+  justify-content: center;
+  min-width: 19px;
+  padding: 0 5px;
+}
+
+.mm-storage-notice {
+  background: #fff4d6;
+  color: #66450d;
+  font-size: 11px;
+  padding: 9px 20px;
+  text-align: center;
+}
+
 .mm-nav a:hover,
 .mm-text-link:hover {
   color: var(--mm-accent);
@@ -525,6 +552,42 @@
   width: 100%;
 }
 
+.mm-product-card {
+  position: relative;
+}
+
+.mm-product-card-link {
+  display: block;
+  padding: 0 0 10px;
+}
+
+.mm-wishlist-toggle {
+  align-items: center;
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  border-radius: 50%;
+  color: var(--mm-ink);
+  cursor: pointer;
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  transition: color .15s, background .15s, transform .15s;
+  width: 42px;
+}
+
+.mm-wishlist-toggle:hover,
+.mm-wishlist-toggle.is-saved,
+.mm-button-secondary.is-saved {
+  color: var(--mm-accent);
+}
+
+.mm-wishlist-toggle:hover {
+  transform: scale(1.04);
+}
+
 .mm-product-card:hover .mm-product-image img {
   transform: scale(1.04);
 }
@@ -544,6 +607,150 @@
   color: var(--mm-accent);
   font-size: 12px;
   margin-top: 8px;
+}
+
+.mm-product-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.mm-product-actions .mm-button {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.mm-product-actions .mm-button-secondary {
+  background: var(--mm-panel);
+  color: var(--mm-ink) !important;
+}
+
+.mm-cart-notice,
+.mm-personal-storage-note {
+  color: var(--mm-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.mm-cart-notice {
+  margin: 8px 0 18px;
+}
+
+.mm-personal-storage-note {
+  margin: 20px 0;
+}
+
+.mm-bag-list {
+  border-top: 1px solid var(--mm-line);
+  display: grid;
+}
+
+.mm-bag-line {
+  align-items: center;
+  border-bottom: 1px solid var(--mm-line);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  padding: 18px 0;
+}
+
+.mm-bag-image {
+  align-items: center;
+  aspect-ratio: 4 / 5;
+  background: var(--mm-soft);
+  color: var(--mm-accent);
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.mm-bag-image img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.mm-bag-info,
+.mm-bag-line-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.mm-bag-info strong,
+.mm-bag-line-actions strong {
+  font-size: 13px;
+}
+
+.mm-bag-info > span {
+  color: var(--mm-muted);
+  font-size: 11px;
+}
+
+.mm-bag-info .mm-bag-stock-warning {
+  color: #9a3412;
+}
+
+.mm-bag-quantity {
+  align-items: center;
+  color: var(--mm-muted);
+  display: flex;
+  font-size: 10px;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.mm-bag-quantity input {
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  min-height: 34px;
+  padding: 5px 8px;
+  width: 64px;
+}
+
+.mm-bag-line-actions {
+  justify-items: end;
+}
+
+.mm-remove-item {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--mm-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 10px;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.mm-remove-item:hover {
+  color: #a02828;
+}
+
+.mm-bag-summary {
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  margin: 24px 0;
+  max-width: 560px;
+  padding: 22px;
+}
+
+.mm-bag-summary > div {
+  align-items: center;
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+}
+
+.mm-bag-summary > p {
+  color: var(--mm-muted);
+  font-size: 11px;
+  line-height: 1.7;
 }
 
 .mm-state {
@@ -871,6 +1078,27 @@
 }
 
 @media (max-width: 560px) {
+  .mm-bag-line {
+    align-items: start;
+    gap: 12px;
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .mm-bag-line-actions {
+    align-items: center;
+    grid-column: 2;
+    grid-template-columns: 1fr 1fr;
+    justify-items: start;
+  }
+
+  .mm-bag-line-actions strong {
+    grid-column: 1 / -1;
+  }
+
+  .mm-nav {
+    justify-content: space-between;
+  }
+
   .mm-config-state {
     padding: 20px;
   }

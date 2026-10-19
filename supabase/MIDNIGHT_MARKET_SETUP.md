@@ -11,11 +11,12 @@ The standalone storefront and seller studio live in the `Davi-d-M/Halloween` rep
 3. Apply [`MIDNIGHT_MARKET_ORDERS_UPGRADE.sql`](./MIDNIGHT_MARKET_ORDERS_UPGRADE.sql) after the Studio upgrade. It adds customer order requests and merchant fulfilment status. Requests are unpaid; a merchant confirms stock, then contacts the buyer to arrange payment and delivery. The merchant manually records payment received before fulfilment. Confirmation reserves stock and marking fulfilled deducts it.
 4. Apply [`MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql`](./MIDNIGHT_MARKET_OPERATIONS_UPGRADE.sql) after the Orders upgrade. It stores verified seller contact details on approved boutiques so the Online Bar Market Desk can coordinate offers and order requests.
 5. Apply [`MIDNIGHT_MARKET_ADMIN_CONTROL_UPGRADE.sql`](./MIDNIGHT_MARKET_ADMIN_CONTROL_UPGRADE.sql) after the Operations upgrade. It enables audited Online Bar actions to hide/restore any product listing and intervene in order fulfilment while maintaining stock reservations.
-6. Apply [`MIDNIGHT_MARKET_AVAILABILITY_MIGRATION.sql`](./MIDNIGHT_MARKET_AVAILABILITY_MIGRATION.sql) last. It adds available-now, planned, and made-to-order states; planned and made-to-order listings collect enquiries only, and a database trigger rejects order requests for those states.
-7. Configure `NEXT_PUBLIC_SUPABASE_URL`, a public Supabase key (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`), and `SUPABASE_SERVICE_ROLE_KEY` in both deployments. Keep the service-role key server-only.
-8. Configure Supabase Auth email confirmation and an SMS provider before enabling seller applications. Seller approval in Halloween Market Desk remains blocked until the applicant verifies the matching email and phone.
-9. Add the standalone site's `/merchant/portal/login` callback to Supabase Auth's allowed redirect URLs.
-10. Configure `RESEND_API_KEY` only if the deployment wants email notifications; current offer and order-request flows do not send automatic emails.
+6. Apply [`MIDNIGHT_MARKET_AVAILABILITY_MIGRATION.sql`](./MIDNIGHT_MARKET_AVAILABILITY_MIGRATION.sql). It adds available-now, planned, and made-to-order states; planned and made-to-order listings collect enquiries only, and a database trigger rejects order requests for those states.
+7. Apply [`MIDNIGHT_MARKET_CUSTOMER_SAFETY_MIGRATION.sql`](./MIDNIGHT_MARKET_CUSTOMER_SAFETY_MIGRATION.sql) after the availability migration. It stores customer reports privately and adds an audited Online Bar review workflow.
+8. Configure `NEXT_PUBLIC_SUPABASE_URL`, a public Supabase key (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`), and `SUPABASE_SERVICE_ROLE_KEY` in both deployments. Keep the service-role key server-only.
+9. Configure Supabase Auth email confirmation and an SMS provider before enabling seller applications. Seller approval in Halloween Market Desk remains blocked until the applicant verifies the matching email and phone.
+10. Add the standalone site's `/merchant/portal/login` callback to Supabase Auth's allowed redirect URLs.
+11. Configure `RESEND_API_KEY` only if the deployment wants email notifications; current offer and order-request flows do not send automatic emails.
 
 ## Account and offer boundaries
 

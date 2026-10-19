@@ -3,11 +3,12 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, ArrowRight, Handshake, MoonStar, Search, Store } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Heart, Handshake, MoonStar, Search, ShoppingBag, Store, Trash2 } from 'lucide-react';
 import MarketLogo from './market-logo';
+import { useMarketShopping } from './market-shopping';
 
 type Category = { name: string; slug: string; description: string | null };
-type Product = {
+export type Product = {
   id: string;
   name: string;
   slug: string;
@@ -26,6 +27,7 @@ type Product = {
     priceMinor: number;
     salePriceMinor: number | null;
     currency: string;
+    availableQuantity: number;
     inStock: boolean;
   }>;
   images: Array<{ url: string; alt: string; mediaType: 'image' | 'video' }>;
@@ -106,21 +108,28 @@ function useCatalog(filters = '') {
 }
 
 function MarketHeader() {
+  const { cart, wishlist, storageError } = useMarketShopping();
   return (
-    <header className="mm-header">
-      <Link className="mm-brand" href="/shop" aria-label="Midnight Market home">
-        <MarketLogo className="mm-brand-mark" />
-        <span className="mm-brand-name">MIDNIGHT <span>MARKET</span></span>
-      </Link>
-      <nav className="mm-nav" aria-label="Market navigation">
-        <Link href="/shop">Discover</Link>
-        <Link href="/shop#categories">Categories</Link>
-      </nav>
-    </header>
+    <>
+      <header className="mm-header">
+        <Link className="mm-brand" href="/shop" aria-label="Midnight Market home">
+          <MarketLogo className="mm-brand-mark" />
+          <span className="mm-brand-name">MIDNIGHT <span>MARKET</span></span>
+        </Link>
+        <nav className="mm-nav" aria-label="Market navigation">
+          <Link href="/shop">Discover</Link>
+          <Link href="/shop#categories">Categories</Link>
+          <Link href="/shop/wishlist"><Heart size={15} /> Saved <span className="mm-header-count">{wishlist.length}</span></Link>
+          <Link href="/shop/bag"><ShoppingBag size={15} /> Bag <span className="mm-header-count">{cart.reduce((count, line) => count + line.quantity, 0)}</span></Link>
+        </nav>
+      </header>
+      {storageError && <div className="mm-storage-notice" role="status">{storageError}</div>}
+    </>
   );
 }
 
 function ProductGrid({ products, emptyMessage }: { products: Product[]; emptyMessage?: string }) {
+  const { isWishlisted, toggleWishlist } = useMarketShopping();
   if (products.length === 0) {
     return <div className="mm-state">{emptyMessage || 'New independent boutiques are joining. Check back soon.'}</div>;
   }
@@ -135,8 +144,12 @@ function ProductGrid({ products, emptyMessage }: { products: Product[]; emptyMes
           : product.availabilityStatus === 'made_to_order'
             ? 'Made to order'
             : inStock ? 'Available now' : 'Sold out';
+        const priceMinor = product.variants.length
+          ? Math.min(...product.variants.map((variant) => variant.salePriceMinor ?? variant.priceMinor))
+          : null;
         return (
-          <Link className="mm-product-card" href={`/shop/product/${product.slug}`} key={product.id}>
+          <article className="mm-product-card" key={product.id}>
+            <Link className="mm-product-card-link" href={`/shop/product/${product.slug}`}>
             <div className="mm-product-image">
               {product.images[0]
                 ? product.images[0].mediaType === 'video'
@@ -148,14 +161,125 @@ function ProductGrid({ products, emptyMessage }: { products: Product[]; emptyMes
             <h3>{product.name}</h3>
             <div className="mm-product-meta">{product.merchant.name}{product.category ? ` · ${product.category.name}` : ''}</div>
             <div className="mm-product-price">
-              {new Intl.NumberFormat('en-KE', { style: 'currency', currency }).format(
-                Math.min(...product.variants.map((variant) => variant.salePriceMinor ?? variant.priceMinor)) / 100
-              )}
+              {priceMinor === null ? 'Price on request' : new Intl.NumberFormat('en-KE', { style: 'currency', currency }).format(priceMinor / 100)}
             </div>
-          </Link>
+            </Link>
+            <button
+              className={`mm-wishlist-toggle${isWishlisted(product.id) ? ' is-saved' : ''}`}
+              type="button"
+              aria-label={isWishlisted(product.id) ? `Remove ${product.name} from saved items` : `Save ${product.name}`}
+              aria-pressed={isWishlisted(product.id)}
+              onClick={() => toggleWishlist(product)}
+            >
+              <Heart size={18} fill={isWishlisted(product.id) ? 'currentColor' : 'none'} />
+            </button>
+          </article>
         );
       })}
     </div>
+  );
+}
+
+function formatMarketPrice(amountMinor: number, currency: string) {
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency }).format(amountMinor / 100);
+}
+
+export function MarketWishlistPage() {
+  const { wishlist, ready } = useMarketShopping();
+  return (
+    <>
+      <MarketHeader />
+      <main className="mm-page">
+        <div className="mm-section-heading">
+          <div>
+            <Link className="mm-text-link" href="/shop"><ArrowLeft size={14} /> Back to discover</Link>
+            <div className="mm-eyebrow" style={{ marginTop: 24 }}>Your picks</div>
+            <h2>Saved pieces</h2>
+          </div>
+        </div>
+        {!ready
+          ? <div className="mm-state" role="status">Loading saved pieces…</div>
+          : <ProductGrid products={wishlist} emptyMessage="Your saved pieces will appear here. Tap the heart on a product to keep it close." />}
+        <p className="mm-personal-storage-note">Saved items are stored in this browser on this device. They are not yet connected to a customer account.</p>
+        <MarketFooter />
+      </main>
+    </>
+  );
+}
+
+export function MarketBagPage() {
+  const { cart, ready, removeFromCart, updateCartQuantity } = useMarketShopping();
+  const estimatedTotals = cart.reduce((totals, line) => {
+    const variant = line.product.variants.find((item) => item.id === line.variantId);
+    if (!variant) return totals;
+    totals[variant.currency] = (totals[variant.currency] || 0) + (variant.salePriceMinor ?? variant.priceMinor) * line.quantity;
+    return totals;
+  }, {} as Record<string, number>);
+
+  return (
+    <>
+      <MarketHeader />
+      <main className="mm-page">
+        <div className="mm-section-heading">
+          <div>
+            <Link className="mm-text-link" href="/shop"><ArrowLeft size={14} /> Back to discover</Link>
+            <div className="mm-eyebrow" style={{ marginTop: 24 }}>Your selection</div>
+            <h2>Your bag</h2>
+          </div>
+        </div>
+        {!ready
+          ? <div className="mm-state" role="status">Loading your bag…</div>
+          : cart.length === 0
+            ? <div className="mm-state">Your bag is empty. Explore approved pieces and add available items to your bag.</div>
+            : <>
+              <div className="mm-bag-list">
+                {cart.map((line) => {
+                  const variant = line.product.variants.find((item) => item.id === line.variantId);
+                  if (!variant) return null;
+                  const unitPriceMinor = variant.salePriceMinor ?? variant.priceMinor;
+                  const option = [variant.size, variant.color].filter(Boolean).join(' / ') || 'Standard';
+                  return (
+                    <article className="mm-bag-line" key={`${line.product.id}:${line.variantId}`}>
+                      <Link className="mm-bag-image" href={`/shop/product/${line.product.slug}`}>
+                        {line.product.images[0]?.mediaType === 'image'
+                          ? <Image src={line.product.images[0].url} alt={line.product.images[0].alt} fill unoptimized sizes="100px" />
+                          : <MoonStar aria-hidden="true" size={30} />}
+                      </Link>
+                      <div className="mm-bag-info">
+                        <Link href={`/shop/product/${line.product.slug}`}><strong>{line.product.name}</strong></Link>
+                        <span>{line.product.merchant.name} · {option}</span>
+                        <span>{formatMarketPrice(unitPriceMinor, variant.currency)} each</span>
+                        {!variant.inStock && <span className="mm-bag-stock-warning">This saved option may have sold out. Refresh the product before sending a request.</span>}
+                        <label className="mm-bag-quantity">
+                          Qty
+                          <input type="number" min="1" max={Math.max(1, Math.min(10, variant.availableQuantity))} value={line.quantity}
+                            onChange={(event) => updateCartQuantity(line.product.id, line.variantId, Number(event.target.value))} />
+                        </label>
+                      </div>
+                      <div className="mm-bag-line-actions">
+                        <strong>{formatMarketPrice(unitPriceMinor * line.quantity, variant.currency)}</strong>
+                        <Link className="mm-text-link" href={`/shop/product/${line.product.slug}?variant=${encodeURIComponent(line.variantId)}&quantity=${line.quantity}#order-request`}>
+                          Request item
+                        </Link>
+                        <button className="mm-remove-item" type="button" onClick={() => removeFromCart(line.product.id, line.variantId)}>
+                          <Trash2 size={15} /> Remove
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <aside className="mm-bag-summary">
+                {Object.entries(estimatedTotals).map(([currency, amount]) => (
+                  <div key={currency}><span>Items subtotal estimate ({currency})</span><strong>{formatMarketPrice(amount, currency)}</strong></div>
+                ))}
+                <p>This bag is a saved shopping list, not a checkout. Send a request for each item; each boutique confirms stock and arranges payment and delivery. Price and stock are rechecked by the server when you send a request.</p>
+                <Link className="mm-button" href="/shop">Continue discovering <ArrowRight size={15} /></Link>
+              </aside>
+            </>}
+        <MarketFooter />
+      </main>
+    </>
   );
 }
 
@@ -330,8 +454,8 @@ function ProductOfferPanel({ product, variant }: { product: Product; variant: Pr
   );
 }
 
-function ProductOrderRequestPanel({ product, variant }: { product: Product; variant: Product['variants'][number] }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', quantity: '1', note: '' });
+function ProductOrderRequestPanel({ product, variant, initialQuantity = 1 }: { product: Product; variant: Product['variants'][number]; initialQuantity?: number }) {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', quantity: String(initialQuantity), note: '' });
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const [reference, setReference] = useState('');
@@ -367,7 +491,7 @@ function ProductOrderRequestPanel({ product, variant }: { product: Product; vari
   }
 
   return (
-    <section className="mm-order-request">
+    <section className="mm-order-request" id="order-request">
       <div className="mm-eyebrow">Request from boutique</div>
       <h2>Request this item</h2>
       <p>This sends an unpaid order request to the boutique. They must confirm availability and contact you to arrange payment and delivery.</p>
@@ -443,6 +567,60 @@ function ProductInterestPanel({ product }: { product: Product }) {
         </form>
       )}
       <p className="mm-offer-privacy">Your contact details go to this boutique and Market Operations for this enquiry only. This is not a preorder; no payment or reservation is created.</p>
+    </section>
+  );
+}
+
+function ProductReportPanel({ product }: { product: Product }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('misleading');
+  const [details, setDetails] = useState('');
+  const [email, setEmail] = useState('');
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
+  const [reference, setReference] = useState('');
+
+  async function submitReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWorking(true);
+    setError('');
+    try {
+      const response = await fetch('/api/market/product-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id, reason, details, email })
+      });
+      const result = await response.json() as { report?: { reference: string }; error?: string };
+      if (!response.ok || !result.report) throw new Error(result.error || 'Could not submit your report.');
+      setReference(result.report.reference);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not submit your report.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <section className="mm-report">
+      <button className="mm-text-link" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        Report a listing
+      </button>
+      {open && (reference
+        ? <p className="mm-state" role="status">Report received · {reference}. Market Operations will review it.</p>
+        : <form className="mm-form" onSubmit={submitReport}>
+          <label>Reason
+            <select value={reason} onChange={(event) => setReason(event.target.value)}>
+              <option value="misleading">Misleading listing</option>
+              <option value="counterfeit">Suspected counterfeit</option>
+              <option value="unsafe">Unsafe item</option>
+              <option value="other">Something else</option>
+            </select>
+          </label>
+          <label>Email for follow-up<input required type="email" autoComplete="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+          <label className="mm-form-wide">What should we review?<textarea required minLength={10} maxLength={1000} rows={4} value={details} onChange={(event) => setDetails(event.target.value)} /></label>
+          {error && <div className="mm-state mm-error mm-form-wide" role="alert">{error}</div>}
+          <button className="mm-button mm-form-wide" type="submit" disabled={working}>{working ? 'Submitting…' : 'Send report'}</button>
+        </form>)}
     </section>
   );
 }
@@ -606,12 +784,26 @@ export function MarketCategoryPage({ slug }: { slug: string }) {
   );
 }
 
-export function MarketProductPage({ slug }: { slug: string }) {
+export function MarketProductPage({ slug, initialVariantId, initialQuantity = 1 }: { slug: string; initialVariantId?: string; initialQuantity?: number }) {
   const { products, loading, error } = useCatalog(`slug=${encodeURIComponent(slug)}`);
   const product = products[0];
-  const [selectedVariant, setSelectedVariant] = useState('');
+  const [selectedVariant, setSelectedVariant] = useState(initialVariantId || '');
   const [selectedImage, setSelectedImage] = useState(0);
-  useEffect(() => setSelectedImage(0), [product?.id]);
+  const [quantity, setQuantity] = useState(initialQuantity);
+  const [cartNotice, setCartNotice] = useState('');
+  const { addToCart, isWishlisted, toggleWishlist } = useMarketShopping();
+  useEffect(() => {
+    setSelectedImage(0);
+    const requestedVariant = product?.variants.find((variant) => variant.id === initialVariantId);
+    const firstInStock = product?.variants.find((variant) => variant.inStock);
+    setSelectedVariant(requestedVariant?.id || firstInStock?.id || product?.variants[0]?.id || '');
+    setQuantity(initialQuantity);
+  }, [initialQuantity, initialVariantId, product]);
+  useEffect(() => {
+    if (product && window.location.hash === '#order-request') {
+      document.getElementById('order-request')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [product]);
   const selected = useMemo(
     () => product?.variants.find((variant) => variant.id === selectedVariant) || product?.variants[0],
     [product, selectedVariant]
@@ -664,10 +856,20 @@ export function MarketProductPage({ slug }: { slug: string }) {
                       {product.variants.length > 1 && (
                         <label className="mm-variant-label">
                           Choose a size or colour
-                          <select value={selected?.id || ''} onChange={(event) => setSelectedVariant(event.target.value)}>
+                          <select value={selected?.id || ''} onChange={(event) => {
+                            setSelectedVariant(event.target.value);
+                            setQuantity(1);
+                          }}>
                             {product.variants.map((variant) => (
-                              <option key={variant.id} value={variant.id}>
+                              <option
+                                key={variant.id}
+                                value={variant.id}
+                                disabled={product.availabilityStatus === 'available_now' && !variant.inStock}
+                              >
                                 {[variant.size, variant.color].filter(Boolean).join(' / ') || 'Standard'}
+                                {product.availabilityStatus === 'available_now'
+                                  ? variant.inStock ? ` · ${variant.availableQuantity} available` : ' · sold out'
+                                  : ''}
                               </option>
                             ))}
                           </select>
@@ -679,18 +881,49 @@ export function MarketProductPage({ slug }: { slug: string }) {
                           {new Intl.NumberFormat('en-KE', { style: 'currency', currency: selected.currency }).format((selected.salePriceMinor ?? selected.priceMinor) / 100)}
                         </div>
                       )}
+                      {product.availabilityStatus === 'available_now' && selected?.inStock && (
+                        <label className="mm-variant-label">
+                          Quantity
+                          <input type="number" min="1" max="10" step="1" value={quantity} onChange={(event) => {
+                            const next = Number(event.target.value);
+                            if (Number.isInteger(next) && next >= 1 && next <= 10) setQuantity(next);
+                          }} />
+                        </label>
+                      )}
                       <div className="mm-product-meta">{product.availabilityStatus === 'planned'
                         ? 'Planned listing · not currently in stock'
                         : product.availabilityStatus === 'made_to_order'
                           ? 'Made to order · confirm terms with the boutique'
-                          : selected?.inStock ? 'Available from this boutique' : 'Currently sold out'}</div>
+                          : selected?.inStock ? `${selected.availableQuantity} available from this boutique` : 'Currently sold out'}</div>
                       {product.availabilityStatus !== 'available_now' && <ProductInterestPanel product={product} />}
                       {product.availabilityStatus === 'available_now' && selected?.inStock && (
                         <>
-                          <ProductOrderRequestPanel product={product} variant={selected} />
+                          <div className="mm-product-actions">
+                            <button className="mm-button" type="button" onClick={() => {
+                              const errorMessage = addToCart(product, selected.id, quantity);
+                              setCartNotice(errorMessage || `${product.name} added to your bag.`);
+                            }}>
+                              <ShoppingBag size={16} /> Add to bag
+                            </button>
+                            <button
+                              className={`mm-button mm-button-secondary${isWishlisted(product.id) ? ' is-saved' : ''}`}
+                              type="button"
+                              aria-pressed={isWishlisted(product.id)}
+                              onClick={() => {
+                                toggleWishlist(product);
+                                setCartNotice(isWishlisted(product.id) ? 'Removed from saved items.' : 'Saved to your wishlist.');
+                              }}
+                            >
+                              <Heart size={16} fill={isWishlisted(product.id) ? 'currentColor' : 'none'} />
+                              {isWishlisted(product.id) ? 'Saved' : 'Save'}
+                            </button>
+                          </div>
+                          {cartNotice && <p className="mm-cart-notice" role="status">{cartNotice}</p>}
+                          <ProductOrderRequestPanel product={product} variant={selected} initialQuantity={quantity} />
                           <ProductOfferPanel product={product} variant={selected} />
                         </>
                       )}
+                      <ProductReportPanel product={product} />
                     </div>
                   </div>
                 </section>

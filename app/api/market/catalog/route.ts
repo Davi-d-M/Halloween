@@ -54,11 +54,12 @@ export async function GET(request: Request) {
   const availability = parameters.get('availability')?.trim();
   const requestedPage = Number(parameters.get('page') || 1);
   const pageSize = 24;
-  if ([category, slug, store, search].some((value) => value && value.length > 100)
-    || !Number.isSafeInteger(requestedPage) || requestedPage < 1 || requestedPage > 10000
-    || (availability && !['available_now', 'planned', 'made_to_order'].includes(availability))) {
-    return NextResponse.json({ error: 'Search filters must be 100 characters or fewer.' }, { status: 400 });
-  }
+  const invalidFilters = [category, slug, store, search].some((value) => value && value.length > 100);
+  const invalidPage = !Number.isSafeInteger(requestedPage) || requestedPage < 1 || requestedPage > 10000;
+  const invalidAvailability = availability && !['available_now', 'planned', 'made_to_order'].includes(availability);
+  if (invalidFilters) return NextResponse.json({ error: 'Search filters must be 100 characters or fewer.' }, { status: 400 });
+  if (invalidPage) return NextResponse.json({ error: 'Catalog page must be a positive whole number.' }, { status: 400 });
+  if (invalidAvailability) return NextResponse.json({ error: 'Choose a valid listing availability filter.' }, { status: 400 });
   const page = requestedPage;
   const searchTerm = search?.replace(/[^\p{L}\p{N}\s-]/gu, '').trim();
   if (search && !searchTerm) {
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
       .order('name'),
     (async () => {
       let query = database.from('mm_products').select(`
-        id, name, slug, description, availability_status, estimated_available_on, attributes, delivery_information, return_policy,
+        id, name, slug, created_at, description, availability_status, estimated_available_on, attributes, delivery_information, return_policy,
         merchant:mm_merchants!inner(name, slug, status),
         category:mm_categories!inner(name, slug),
         variants:mm_product_variants!inner(id, sku, size, color, price_minor, sale_price_minor, currency, active, inventory:mm_inventory(quantity_available, quantity_reserved)),
@@ -131,6 +132,9 @@ export async function GET(request: Request) {
       salePriceMinor: variant.sale_price_minor === null ? null : Number(variant.sale_price_minor),
       sku: variant.sku,
       currency: variant.currency,
+      availableQuantity: variant.inventory
+        ? Math.max(0, variant.inventory.quantity_available - variant.inventory.quantity_reserved)
+        : 0,
       inStock: Boolean(variant.inventory
         && variant.inventory.quantity_available > variant.inventory.quantity_reserved)
     }));
