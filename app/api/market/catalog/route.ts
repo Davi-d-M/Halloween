@@ -51,8 +51,18 @@ export async function GET(request: Request) {
   const slug = parameters.get('slug')?.trim();
   const store = parameters.get('store')?.trim();
   const search = parameters.get('q')?.trim();
-  if ([category, slug, store, search].some((value) => value && value.length > 100)) {
+  const availability = parameters.get('availability')?.trim();
+  const requestedPage = Number(parameters.get('page') || 1);
+  const pageSize = 24;
+  if ([category, slug, store, search].some((value) => value && value.length > 100)
+    || !Number.isSafeInteger(requestedPage) || requestedPage < 1 || requestedPage > 10000
+    || (availability && !['available_now', 'planned', 'made_to_order'].includes(availability))) {
     return NextResponse.json({ error: 'Search filters must be 100 characters or fewer.' }, { status: 400 });
+  }
+  const page = requestedPage;
+  const searchTerm = search?.replace(/[^\p{L}\p{N}\s-]/gu, '').trim();
+  if (search && !searchTerm) {
+    return NextResponse.json({ error: 'Search needs at least one letter or number.' }, { status: 400 });
   }
 
   const [{ data: categories, error: categoriesError }, productsResult, campaignResult] = await Promise.all([
@@ -68,17 +78,20 @@ export async function GET(request: Request) {
         category:mm_categories!inner(name, slug),
         variants:mm_product_variants!inner(id, sku, size, color, price_minor, sale_price_minor, currency, active, inventory:mm_inventory(quantity_available, quantity_reserved)),
         media:mm_product_media(storage_path, media_type, alt_text, sort_order)
-      `)
+      `, { count: 'exact' })
         .eq('status', 'published')
         .eq('merchant.status', 'approved')
         .eq('variants.active', true)
         .order('created_at', { ascending: false })
-        .limit(48);
+        .range((page - 1) * pageSize, page * pageSize - 1);
 
       if (category) query = query.eq('category.slug', category);
       if (slug) query = query.eq('slug', slug);
       if (store) query = query.eq('merchant.slug', store);
-      if (search) query = query.ilike('name', `%${search.replace(/[%_,]/g, '')}%`);
+      if (searchTerm) {
+        query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+      if (availability) query = query.eq('availability_status', availability);
 
       return query;
     })(),
@@ -143,7 +156,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Product photos could not be loaded. Please try again.' }, { status: 503 });
   }
 
-  return NextResponse.json({ categories: categories || [], products, campaign: campaignResult.data }, {
+  const total = productsResult.count || 0;
+  return NextResponse.json({
+    categories: categories || [],
+    products,
+    campaign: campaignResult.data,
+    pagination: { page, pageSize, total, hasMore: page * pageSize < total }
+  }, {
     headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
   });
 }

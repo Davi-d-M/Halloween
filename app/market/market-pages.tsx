@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, ArrowRight, Handshake, MoonStar, Store } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Handshake, MoonStar, Search, Store } from 'lucide-react';
 import MarketLogo from './market-logo';
 
 type Category = { name: string; slug: string; description: string | null };
@@ -34,6 +34,7 @@ type Catalog = {
   categories: Category[];
   products: Product[];
   campaign?: { title: string; message: string } | null;
+  pagination?: { page: number; pageSize: number; total: number; hasMore: boolean };
 };
 
 type OfferThread = {
@@ -53,30 +54,55 @@ function useCatalog(filters = '') {
   const [catalog, setCatalog] = useState<Catalog>({ categories: [], products: [], campaign: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setError(null);
-    fetch(`/api/market/catalog${filters ? `?${filters}` : ''}`, {
+    if (page === 1) setError(null);
+    const parameters = new URLSearchParams(filters);
+    parameters.set('page', String(page));
+    fetch(`/api/market/catalog?${parameters.toString()}`, {
       cache: 'no-store',
       signal: controller.signal
     })
       .then(async (response) => {
         const result = await response.json() as Catalog & { error?: string };
         if (!response.ok) throw new Error(result.error || 'The Market catalog could not be loaded.');
-        setCatalog(result);
+        setCatalog((current) => ({
+          ...result,
+          products: page === 1
+            ? result.products
+            : [...current.products, ...result.products.filter((item) => !current.products.some((existing) => existing.id === item.id))]
+        }));
       })
       .catch((cause: unknown) => {
         if (cause instanceof Error && cause.name === 'AbortError') return;
         setError(cause instanceof Error ? cause.message : 'The Market catalog could not be loaded.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
 
     return () => controller.abort();
-  }, [filters]);
+  }, [filters, page]);
 
-  return { ...catalog, loading, error };
+  const loadMore = useCallback(() => {
+    if (!loading && catalog.pagination?.hasMore) setPage((current) => current + 1);
+  }, [catalog.pagination?.hasMore, loading]);
+
+  return {
+    ...catalog,
+    loading,
+    error,
+    hasMore: catalog.pagination?.hasMore ?? false,
+    total: catalog.pagination?.total ?? catalog.products.length,
+    loadMore
+  };
 }
 
 function MarketHeader() {
@@ -94,9 +120,9 @@ function MarketHeader() {
   );
 }
 
-function ProductGrid({ products }: { products: Product[] }) {
+function ProductGrid({ products, emptyMessage }: { products: Product[]; emptyMessage?: string }) {
   if (products.length === 0) {
-    return <div className="mm-state">New independent boutiques are joining. Check back soon.</div>;
+    return <div className="mm-state">{emptyMessage || 'New independent boutiques are joining. Check back soon.'}</div>;
   }
 
   return (
@@ -422,7 +448,19 @@ function ProductInterestPanel({ product }: { product: Product }) {
 }
 
 export function MarketHomePage() {
-  const { categories, products, loading, error, campaign } = useCatalog();
+  const [searchText, setSearchText] = useState('');
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [availability, setAvailability] = useState('');
+  const filters = useMemo(() => {
+    const parameters = new URLSearchParams();
+    if (search) parameters.set('q', search);
+    if (category) parameters.set('category', category);
+    if (availability) parameters.set('availability', availability);
+    return parameters.toString();
+  }, [availability, category, search]);
+  const { categories, products, loading, error, campaign, hasMore, total, loadMore } = useCatalog(filters);
+  const hasFilters = Boolean(search || category || availability);
 
   return (
     <>
@@ -459,15 +497,73 @@ export function MarketHomePage() {
         <section id="new-arrivals">
           <div className="mm-section-heading">
             <div>
-              <div className="mm-eyebrow">Fresh from our boutiques</div>
-              <h2>Recently discovered</h2>
+              <div className="mm-eyebrow">{hasFilters ? 'Your market search' : 'Fresh from approved boutiques'}</div>
+              <h2>{hasFilters ? 'Find your piece' : 'Recently discovered'}</h2>
             </div>
           </div>
+          <form className="mm-catalog-controls" onSubmit={(event) => {
+            event.preventDefault();
+            setSearch(searchText.trim());
+          }}>
+            <label className="mm-search-field">
+              <span className="mm-visually-hidden">Search products and descriptions</span>
+              <Search aria-hidden="true" size={18} />
+              <input
+                type="search"
+                value={searchText}
+                maxLength={100}
+                placeholder="Search outfits, masks, jewellery…"
+                onChange={(event) => setSearchText(event.target.value)}
+              />
+              <button type="submit">Search</button>
+            </label>
+            <label>
+              <span>Category</span>
+              <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                <option value="">All categories</option>
+                {categories.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Availability</span>
+              <select value={availability} onChange={(event) => setAvailability(event.target.value)}>
+                <option value="">All listings</option>
+                <option value="available_now">Available now</option>
+                <option value="planned">Coming soon</option>
+                <option value="made_to_order">Made to order</option>
+              </select>
+            </label>
+            {hasFilters && <button
+              className="mm-clear-filters"
+              type="button"
+              onClick={() => {
+                setSearchText('');
+                setSearch('');
+                setCategory('');
+                setAvailability('');
+              }}
+            >
+              Clear filters
+            </button>}
+          </form>
+          {!error && <p className="mm-results-count" aria-live="polite">
+            {loading && products.length === 0 ? 'Loading approved pieces…' : `${total.toLocaleString('en-KE')} approved ${total === 1 ? 'piece' : 'pieces'} found`}
+          </p>}
           {error
             ? <div className="mm-state mm-error" role="alert">{error}</div>
             : loading
+              && products.length === 0
               ? <div className="mm-state" role="status">Opening the market…</div>
-              : <ProductGrid products={products} />}
+              : <>
+                <ProductGrid
+                  products={products}
+                  emptyMessage={hasFilters ? 'No approved pieces match those filters. Try a different search or clear your filters.' : undefined}
+                />
+                {loading && products.length > 0 && <div className="mm-state" role="status">Loading more approved pieces…</div>}
+                {hasMore && <button className="mm-button mm-load-more" type="button" disabled={loading} onClick={loadMore}>
+                  {loading ? 'Loading…' : 'Load more pieces'} <ArrowRight size={15} />
+                </button>}
+              </>}
         </section>
 
         <MarketFooter />
@@ -477,7 +573,7 @@ export function MarketHomePage() {
 }
 
 export function MarketCategoryPage({ slug }: { slug: string }) {
-  const { categories, products, loading, error } = useCatalog(`category=${encodeURIComponent(slug)}`);
+  const { categories, products, loading, error, hasMore, total, loadMore } = useCatalog(`category=${encodeURIComponent(slug)}`);
   const category = categories.find((item) => item.slug === slug);
 
   return (
@@ -494,9 +590,16 @@ export function MarketCategoryPage({ slug }: { slug: string }) {
         </div>
         {error
           ? <div className="mm-state mm-error" role="alert">{error}</div>
-          : loading
+          : loading && products.length === 0
             ? <div className="mm-state" role="status">Finding pieces…</div>
-            : <ProductGrid products={products} />}
+            : <>
+              <p className="mm-results-count" aria-live="polite">{total.toLocaleString('en-KE')} approved {total === 1 ? 'piece' : 'pieces'}</p>
+              <ProductGrid products={products} />
+              {loading && <div className="mm-state" role="status">Loading more approved pieces…</div>}
+              {hasMore && <button className="mm-button mm-load-more" type="button" disabled={loading} onClick={loadMore}>
+                {loading ? 'Loading…' : 'Load more pieces'} <ArrowRight size={15} />
+              </button>}
+            </>}
         <MarketFooter />
       </main>
     </>
@@ -599,7 +702,7 @@ export function MarketProductPage({ slug }: { slug: string }) {
 }
 
 export function MarketStorePage({ slug }: { slug: string }) {
-  const { products, loading, error } = useCatalog(`store=${encodeURIComponent(slug)}`);
+  const { products, loading, error, hasMore, total, loadMore } = useCatalog(`store=${encodeURIComponent(slug)}`);
   const merchant = products[0]?.merchant;
 
   return (
@@ -615,9 +718,16 @@ export function MarketStorePage({ slug }: { slug: string }) {
         </div>
         {error
           ? <div className="mm-state mm-error" role="alert">{error}</div>
-          : loading
+          : loading && products.length === 0
             ? <div className="mm-state" role="status">Opening boutique…</div>
-            : <ProductGrid products={products} />}
+            : <>
+              <p className="mm-results-count" aria-live="polite">{total.toLocaleString('en-KE')} approved {total === 1 ? 'piece' : 'pieces'}</p>
+              <ProductGrid products={products} />
+              {loading && <div className="mm-state" role="status">Loading more approved pieces…</div>}
+              {hasMore && <button className="mm-button mm-load-more" type="button" disabled={loading} onClick={loadMore}>
+                {loading ? 'Loading…' : 'Load more pieces'} <ArrowRight size={15} />
+              </button>}
+            </>}
         <MarketFooter />
       </main>
     </>

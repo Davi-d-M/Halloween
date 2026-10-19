@@ -363,6 +363,115 @@
   color: var(--mm-accent) !important;
 }
 
+.mm-catalog-controls {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, .38fr) minmax(150px, .38fr) auto;
+  margin-bottom: 16px;
+}
+
+.mm-catalog-controls > label {
+  color: var(--mm-muted);
+  display: grid;
+  font-size: 9px;
+  font-weight: 700;
+  gap: 7px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.mm-catalog-controls > label > input,
+.mm-catalog-controls > label > select,
+.mm-search-field {
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  color: var(--mm-ink);
+  min-height: 48px;
+}
+
+.mm-catalog-controls > label > input,
+.mm-catalog-controls > label > select {
+  border-radius: 4px;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.mm-search-field {
+  align-items: center;
+  border-radius: 4px;
+  display: flex;
+  gap: 10px;
+  padding-left: 12px;
+}
+
+.mm-search-field:focus-within,
+.mm-catalog-controls > label > input:focus,
+.mm-catalog-controls > label > select:focus {
+  border-color: var(--mm-accent);
+  outline: 2px solid color-mix(in srgb, var(--mm-accent) 20%, transparent);
+}
+
+.mm-search-field input {
+  background: transparent;
+  border: 0;
+  color: var(--mm-ink);
+  min-width: 0;
+  outline: 0;
+  padding: 12px 0;
+  width: 100%;
+}
+
+.mm-search-field button {
+  align-self: stretch;
+  background: var(--mm-accent);
+  border: 0;
+  color: var(--primary-foreground, #fff);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  padding: 0 16px;
+  text-transform: uppercase;
+}
+
+.mm-clear-filters {
+  background: transparent;
+  border: 0;
+  color: var(--mm-accent);
+  cursor: pointer;
+  font-size: 10px;
+  min-height: 42px;
+  padding: 0 4px;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.mm-results-count {
+  color: var(--mm-muted);
+  font-size: 11px;
+  margin: 0 0 18px;
+}
+
+.mm-load-more {
+  display: flex;
+  margin: 28px auto 0;
+}
+
+.mm-load-more:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.mm-visually-hidden {
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .mm-product-grid {
   display: grid;
   gap: 28px 18px;
@@ -654,6 +763,18 @@
 
   .mm-product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mm-catalog-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mm-search-field {
+    grid-column: 1 / -1;
+  }
+
+  .mm-clear-filters {
+    justify-self: start;
   }
 
   .mm-detail-grid {
