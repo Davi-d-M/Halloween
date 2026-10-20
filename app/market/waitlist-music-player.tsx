@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Headphones, Pause, Play, Volume2 } from 'lucide-react';
 
-type Track = { id: string; genre: string; title: string; url: string };
+type Track = { id: string; collection: string; title: string; url: string };
 
 export default function WaitlistMusicPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -21,7 +21,6 @@ export default function WaitlistMusicPlayer() {
         if (!response.ok) throw new Error(result.error || 'Waitlist tracks could not be loaded.');
         if (!Array.isArray(result.tracks)) throw new Error('Waitlist tracks could not be loaded.');
         setTracks(result.tracks);
-        setSelectedTrackId(result.tracks[0]?.id || '');
       })
       .catch((cause: unknown) => {
         if (cause instanceof Error && cause.name === 'AbortError') return;
@@ -56,6 +55,11 @@ export default function WaitlistMusicPlayer() {
   function selectTrack(id: string) {
     setSelectedTrackId(id);
     setError('');
+    if (!id) {
+      audioRef.current?.pause();
+      setPlaying(false);
+      return;
+    }
     if (!playing) return;
     const track = tracks.find((item) => item.id === id);
     const audio = audioRef.current;
@@ -103,7 +107,10 @@ export default function WaitlistMusicPlayer() {
         >
           {tracks.length === 0
             ? <option value="">{loading ? 'Loading tracks…' : 'No tracks available'}</option>
-            : tracks.map((track) => <option key={track.id} value={track.id}>{track.genre} · {track.title}</option>)}
+            : <>
+              <option value="">Choose a track</option>
+              {tracks.map((track) => <option key={track.id} value={track.id}>{track.collection} · {track.title}</option>)}
+            </>}
         </select>
       </label>
       <button
