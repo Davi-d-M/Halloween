@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import '../market/market.css';
 import { MarketShoppingProvider } from '../market/market-shopping';
+import WaitlistMusicPlayer from '../market/waitlist-music-player';
 
 export const metadata: Metadata = {
   title: 'Midnight Market | Shop',
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function ShopLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <MarketShoppingProvider><div className="mm-shell">{children}</div></MarketShoppingProvider>;
+  return (
+    <MarketShoppingProvider>
+      <div className="mm-shell">{children}</div>
+      <WaitlistMusicPlayer />
+    </MarketShoppingProvider>
+  );
 }

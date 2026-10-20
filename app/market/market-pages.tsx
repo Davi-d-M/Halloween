@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Download, Heart, Handshake, MoonStar, Search, ShoppingBag, Store, Trash2 } from 'lucide-react';
 import MarketLogo from './market-logo';
 import { useMarketShopping } from './market-shopping';
@@ -129,6 +130,8 @@ function useCatalog(filters = '') {
 
 function MarketHeader() {
   const { cart, wishlist, storageError } = useMarketShopping();
+  const pathname = usePathname();
+  const bagCount = cart.reduce((count, line) => count + line.quantity, 0);
   return (
     <>
       <header className="mm-header">
@@ -137,10 +140,14 @@ function MarketHeader() {
           <span className="mm-brand-name">MIDNIGHT <span>MARKET</span></span>
         </Link>
         <nav className="mm-nav" aria-label="Market navigation">
-          <Link href="/shop">Discover</Link>
-          <Link href="/shop#categories">Categories</Link>
-          <Link href="/shop/wishlist"><Heart size={15} /> Saved <span className="mm-header-count">{wishlist.length}</span></Link>
-          <Link href="/shop/bag"><ShoppingBag size={15} /> Bag <span className="mm-header-count">{cart.reduce((count, line) => count + line.quantity, 0)}</span></Link>
+          <Link className={`mm-nav-link${pathname === '/shop' ? ' is-current' : ''}`} href="/shop" aria-current={pathname === '/shop' ? 'page' : undefined}>Discover</Link>
+          <Link className="mm-nav-link" href="/shop#categories">Categories</Link>
+          <Link className={`mm-nav-link${pathname === '/shop/wishlist' ? ' is-current' : ''}`} href="/shop/wishlist" aria-current={pathname === '/shop/wishlist' ? 'page' : undefined}>
+            <Heart size={15} /> Saved <span className="mm-header-count" key={wishlist.length}>{wishlist.length}</span>
+          </Link>
+          <Link className={`mm-nav-link${pathname === '/shop/bag' ? ' is-current' : ''}`} href="/shop/bag" aria-current={pathname === '/shop/bag' ? 'page' : undefined}>
+            <ShoppingBag size={15} /> Bag <span className="mm-header-count" key={bagCount}>{bagCount}</span>
+          </Link>
           <MarketInstallButton />
         </nav>
       </header>

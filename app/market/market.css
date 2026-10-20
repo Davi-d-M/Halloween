@@ -70,10 +70,49 @@
   gap: clamp(12px, 2.5vw, 36px);
 }
 
-.mm-nav a {
+.mm-nav .mm-nav-link {
   align-items: center;
+  border-radius: 999px;
   display: inline-flex;
   gap: 6px;
+  min-height: 40px;
+  padding: 0 11px;
+  position: relative;
+  transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.mm-nav .mm-nav-link:hover {
+  background: color-mix(in srgb, var(--mm-accent) 8%, var(--mm-panel));
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--mm-accent) 11%, transparent);
+  color: var(--mm-accent);
+  transform: translateY(-2px);
+}
+
+.mm-nav .mm-nav-link:active {
+  box-shadow: none;
+  transform: translateY(0) scale(.97);
+}
+
+.mm-nav .mm-nav-link:focus-visible,
+.mm-install-app:focus-visible,
+.mm-install-close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mm-accent) 65%, white);
+  outline-offset: 3px;
+}
+
+.mm-nav .mm-nav-link.is-current {
+  background: color-mix(in srgb, var(--mm-accent) 7%, var(--mm-panel));
+  color: var(--mm-accent);
+  font-weight: 700;
+}
+
+.mm-nav .mm-nav-link svg {
+  flex: 0 0 auto;
+  transition: transform 180ms ease;
+}
+
+.mm-nav .mm-nav-link:hover svg {
+  transform: scale(1.15) rotate(-7deg);
 }
 
 .mm-header-count {
@@ -87,6 +126,16 @@
   justify-content: center;
   min-width: 19px;
   padding: 0 5px;
+}
+
+@keyframes mm-count-pop {
+  0% { transform: scale(.7); }
+  65% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.mm-header-count {
+  animation: mm-count-pop 260ms ease-out;
 }
 
 .mm-storage-notice {
@@ -115,11 +164,173 @@
   gap: 6px;
   padding: 8px 12px;
   white-space: nowrap;
+  transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease;
 }
 
 .mm-install-app:hover {
+  background: color-mix(in srgb, var(--mm-accent) 8%, var(--mm-panel));
   border-color: var(--mm-accent);
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--mm-accent) 11%, transparent);
   color: var(--mm-accent);
+  transform: translateY(-2px);
+}
+
+.mm-install-app:active {
+  box-shadow: none;
+  transform: translateY(0) scale(.97);
+}
+
+.mm-music-player {
+  align-items: center;
+  background: rgb(36 23 46 / 96%);
+  border: 1px solid rgb(235 203 152 / 35%);
+  border-radius: 18px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  box-shadow: 0 14px 40px rgb(20 13 27 / 28%);
+  color: #fff9ef;
+  display: flex;
+  gap: 12px;
+  left: 50%;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 10px 12px;
+  position: fixed;
+  transform: translateX(-50%);
+  width: max-content;
+  z-index: 70;
+}
+
+.mm-music-player-brand {
+  align-items: center;
+  background: rgb(241 213 168 / 12%);
+  border-radius: 12px;
+  color: #f1d5a8;
+  display: flex;
+  flex: 0 0 38px;
+  height: 38px;
+  justify-content: center;
+  position: relative;
+}
+
+.mm-music-player-brand svg + svg {
+  bottom: 3px;
+  position: absolute;
+  right: 1px;
+}
+
+.mm-music-player-info {
+  display: grid;
+  gap: 4px;
+  min-width: 112px;
+}
+
+.mm-music-player-eyebrow {
+  color: #d9c4a4;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.mm-music-player-info strong {
+  font-size: 12px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-music-track-select select {
+  appearance: none;
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  color: #fff9ef;
+  cursor: pointer;
+  font-size: 11px;
+  max-width: 190px;
+  min-height: 38px;
+  padding: 0 28px 0 12px;
+}
+
+.mm-music-track-select select:focus-visible {
+  outline: 2px solid #f1d5a8;
+  outline-offset: 2px;
+}
+
+.mm-music-track-select select:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.mm-music-track-select option {
+  background: #24172e;
+  color: #fff9ef;
+}
+
+.mm-music-play {
+  align-items: center;
+  background: #f1d5a8;
+  border: 1px solid #f1d5a8;
+  border-radius: 999px;
+  color: #24172e;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 5px;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 13px;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.mm-music-play:hover:not(:disabled) {
+  background: #fff0d4;
+  box-shadow: 0 0 0 4px rgb(241 213 168 / 14%);
+  transform: translateY(-1px);
+}
+
+.mm-music-play:active:not(:disabled) {
+  transform: scale(.96);
+}
+
+.mm-music-play:focus-visible {
+  outline: 3px solid #fff9ef;
+  outline-offset: 3px;
+}
+
+.mm-music-play:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.mm-music-player-error {
+  color: #ffd2cf;
+  font-size: 10px;
+  max-width: 150px;
+}
+
+.mm-visually-hidden {
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-nav .mm-nav-link,
+  .mm-nav .mm-nav-link svg,
+  .mm-header-count,
+  .mm-install-app,
+  .mm-music-play {
+    animation: none;
+    scroll-behavior: auto;
+    transition: none;
+  }
 }
 
 .mm-install-overlay {
@@ -1256,6 +1467,36 @@
 
   .mm-nav {
     justify-content: space-between;
+  }
+
+  .mm-music-player {
+    bottom: max(68px, calc(env(safe-area-inset-bottom) + 64px));
+    gap: 8px;
+    max-width: calc(100vw - 20px);
+    padding: 8px;
+    width: calc(100vw - 20px);
+  }
+
+  .mm-music-player-info {
+    flex: 1 1 auto;
+    min-width: 70px;
+  }
+
+  .mm-music-player-info strong {
+    max-width: 120px;
+  }
+
+  .mm-music-track-select select {
+    max-width: min(38vw, 160px);
+    padding-left: 9px;
+  }
+
+  .mm-music-play {
+    padding: 0 10px;
+  }
+
+  .mm-music-player-error {
+    display: none;
   }
 
   .mm-config-state {
