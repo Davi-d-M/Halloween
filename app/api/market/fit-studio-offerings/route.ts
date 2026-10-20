@@ -21,22 +21,32 @@ export async function GET() {
     }, { status: 503 });
   }
 
-  const { data, error } = await database
-    .from('fit_service_offerings')
-    .select('id, service_key, title, description, image_url, price_kes')
-    .eq('published', true)
-    .eq('available', true)
-    .order('updated_at', { ascending: false })
-    .limit(12);
+  const pageSize = 24;
+  const offerings = [];
+  let from = 0;
 
-  if (error) {
-    console.error('[MidnightMarket] Could not load published Fit Studio listings:', error.code);
-    return NextResponse.json({
-      error: 'Published Fit Studio listings could not be loaded. Check that the shared Fit Studio marketplace migration is applied.'
-    }, { status: 503 });
+  while (true) {
+    const { data, error } = await database
+      .from('fit_service_offerings')
+      .select('id, service_key, title, description, image_url, price_kes')
+      .eq('published', true)
+      .eq('available', true)
+      .order('updated_at', { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error('[MidnightMarket] Could not load published Fit Studio listings:', error.code);
+      return NextResponse.json({
+        error: 'Published Fit Studio listings could not be loaded. Check that the shared Fit Studio marketplace migration is applied.'
+      }, { status: 503 });
+    }
+
+    offerings.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
   }
 
-  return NextResponse.json({ offerings: data || [] }, {
+  return NextResponse.json({ offerings }, {
     headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' }
   });
 }

@@ -228,8 +228,6 @@ function FitStudioEditSection() {
     return () => controller.abort();
   }, []);
 
-  if (!loading && !error && offerings.length === 0) return null;
-
   return (
     <section className="mm-fit-edit" aria-labelledby="fit-edit-heading">
       <div className="mm-section-heading">
@@ -243,6 +241,8 @@ function FitStudioEditSection() {
         ? <div className="mm-state mm-error" role="alert">{error}</div>
         : loading
           ? <div className="mm-state" role="status">Loading Halloween finds…</div>
+        : offerings.length === 0
+          ? <div className="mm-state">No Halloween finds have been published yet. Admin listings appear here after they are marked available and published.</div>
           : <div className="mm-fit-edit-grid">
             {offerings.map((offering) => (
               <article className="mm-fit-edit-card" key={offering.id}>
