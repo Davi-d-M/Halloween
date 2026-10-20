@@ -102,6 +102,78 @@
   color: var(--mm-accent);
 }
 
+.mm-install-app {
+  align-items: center;
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  border-radius: 999px;
+  color: var(--mm-ink);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.mm-install-app:hover {
+  border-color: var(--mm-accent);
+  color: var(--mm-accent);
+}
+
+.mm-install-overlay {
+  align-items: center;
+  background: rgb(15 18 28 / 55%);
+  display: grid;
+  inset: 0;
+  padding: 20px;
+  position: fixed;
+  z-index: 1100;
+}
+
+.mm-install-dialog {
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-line);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 22%);
+  margin: 0 auto;
+  max-width: 440px;
+  padding: 28px;
+  position: relative;
+  width: 100%;
+}
+
+.mm-install-dialog h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(28px, 7vw, 38px);
+  font-weight: 400;
+  line-height: 1.05;
+  margin: 14px 0;
+}
+
+.mm-install-dialog p {
+  color: var(--mm-muted);
+  line-height: 1.65;
+}
+
+.mm-install-dialog .mm-install-note {
+  font-size: 12px;
+}
+
+.mm-install-close {
+  background: transparent;
+  border: 0;
+  color: var(--mm-muted);
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+  padding: 4px 8px;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+
 .mm-text-link {
   align-items: center;
   display: inline-flex;

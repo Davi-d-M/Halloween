@@ -7,23 +7,27 @@ import { marketSupabase } from '@/lib/marketSupabaseClient';
 
 export default function MarketSellerAccountRegistrationPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
   async function createAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get('name') || '').trim();
+    const email = String(formData.get('email') || '').trim();
+    const phone = String(formData.get('phone') || '').trim();
+    const password = String(formData.get('password') || '');
     setWorking(true);
     setError('');
     setMessage('');
     try {
       if (!marketSupabase) throw new Error('Market seller accounts are not configured.');
       const { data, error: signupError } = await marketSupabase.auth.signUp({
-        email: form.email.trim(),
-        password: form.password,
+        email,
+        password,
         options: {
-          data: { full_name: form.name.trim(), market_contact_phone: form.phone.trim() },
+          data: { full_name: name, market_contact_phone: phone },
           emailRedirectTo: `${window.location.origin}/merchant/portal/login`
         }
       });
@@ -52,10 +56,10 @@ export default function MarketSellerAccountRegistrationPage() {
           <h1>Create a Market seller account.</h1>
           <p className="mm-register-copy">This account is separate from customer sign-in. Creating one does not approve a shop or grant selling access.</p>
           <form className="mm-form" onSubmit={createAccount}>
-            <label>Full name<input required autoComplete="name" minLength={2} maxLength={160} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-            <label>Email<input required type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
-            <label>Phone<input required type="tel" autoComplete="tel" minLength={7} maxLength={40} placeholder="+254 7XX XXX XXX" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
-            <label>Password<input required type="password" autoComplete="new-password" minLength={10} maxLength={128} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>
+            <label>Full name<input name="name" required autoComplete="name" minLength={2} maxLength={160} /></label>
+            <label>Email<input name="email" required type="email" autoComplete="email" maxLength={254} /></label>
+            <label>Phone<input name="phone" required type="tel" autoComplete="tel" minLength={7} maxLength={40} placeholder="+254 7XX XXX XXX" /></label>
+            <label>Password<input name="password" required type="password" autoComplete="new-password" minLength={10} maxLength={128} /></label>
             {error && <div className="mm-state mm-error mm-form-wide" role="alert">{error}</div>}
             {message && <div className="mm-state mm-form-wide" role="status">{message}</div>}
             <button className="mm-button mm-form-wide" type="submit" disabled={working}>{working ? 'Creating account…' : 'Create seller account'}</button>

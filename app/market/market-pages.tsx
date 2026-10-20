@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, ArrowRight, Heart, Handshake, MoonStar, Search, ShoppingBag, Store, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, Heart, Handshake, MoonStar, Search, ShoppingBag, Store, Trash2 } from 'lucide-react';
 import MarketLogo from './market-logo';
 import { useMarketShopping } from './market-shopping';
 
@@ -141,9 +141,91 @@ function MarketHeader() {
           <Link href="/shop#categories">Categories</Link>
           <Link href="/shop/wishlist"><Heart size={15} /> Saved <span className="mm-header-count">{wishlist.length}</span></Link>
           <Link href="/shop/bag"><ShoppingBag size={15} /> Bag <span className="mm-header-count">{cart.reduce((count, line) => count + line.quantity, 0)}</span></Link>
+          <MarketInstallButton />
         </nav>
       </header>
       {storageError && <div className="mm-storage-notice" role="status">{storageError}</div>}
+    </>
+  );
+}
+
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
+function MarketInstallButton() {
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isAppleMobile, setIsAppleMobile] = useState(false);
+
+  useEffect(() => {
+    setIsInstalled(window.matchMedia('(display-mode: standalone)').matches);
+    setIsAppleMobile(/iphone|ipad|ipod/i.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    const onInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+      setShowHelp(false);
+    };
+
+    window.addEventListener('beforeinstallprompt', onInstallPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onInstallPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  async function installShop() {
+    if (!installPrompt) {
+      setShowHelp(true);
+      return;
+    }
+
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      setInstallPrompt(null);
+      if (choice.outcome === 'dismissed') setShowHelp(true);
+    } catch (error) {
+      console.error('[PWA] The install prompt could not be opened:', error);
+      setInstallPrompt(null);
+      setShowHelp(true);
+    }
+  }
+
+  return (
+    <>
+      {!isInstalled && (
+        <button className="mm-install-app" type="button" onClick={() => void installShop()}>
+          <Download size={14} /> Install app
+        </button>
+      )}
+      {showHelp && (
+        <div className="mm-install-overlay" role="presentation" onClick={(event) => {
+          if (event.target === event.currentTarget) setShowHelp(false);
+        }}>
+          <section className="mm-install-dialog" role="dialog" aria-modal="true" aria-labelledby="mm-install-heading">
+            <button className="mm-install-close" type="button" onClick={() => setShowHelp(false)} aria-label="Close install instructions">×</button>
+            <div className="mm-eyebrow">Take the shop with you</div>
+            <h2 id="mm-install-heading">Add Midnight Market to your home screen</h2>
+            <p>
+              {isAppleMobile
+                ? 'In Safari, tap Share, then choose “Add to Home Screen”.'
+                : 'Open your browser menu and choose “Install app” or “Add to Home screen”.'}
+            </p>
+            <p className="mm-install-note">The shop needs an internet connection to show the latest products and availability.</p>
+            <button className="mm-button" type="button" onClick={() => setShowHelp(false)}>Got it</button>
+          </section>
+        </div>
+      )}
     </>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { record } from 'rrweb';
 import { usePathname } from 'next/navigation';
 
 const CONSENT_KEY = 'ob_session_replay_consent';
@@ -124,6 +123,8 @@ export default function SessionReplay() {
     let stopped = false;
     let sending = false;
     let count = 0;
+    let stop: (() => void) | undefined;
+    let interval: ReturnType<typeof setInterval> | undefined;
     const pending: unknown[] = [];
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -151,38 +152,48 @@ export default function SessionReplay() {
       }
     }
 
-    let stop: (() => void) | undefined;
-    stop = record({
-      emit(event) {
+    async function startRecording() {
+      try {
+        const { record } = await import('rrweb');
         if (stopped) return;
-        if (hasQueryString()) {
-          stopped = true;
-          stop?.();
-          void flush();
+
+        stop = record({
+          emit(event) {
+            if (stopped) return;
+            if (hasQueryString()) {
+              stopped = true;
+              stop?.();
+              void flush();
+              return;
+            }
+            if (count >= MAX_EVENTS) return;
+            count++;
+            pending.push(sanitizeReplayEvent(event));
+            if (pending.length >= 40) void flush();
+          },
+          maskAllInputs: true,
+          maskTextSelector: '*',
+          blockClass: 'session-replay-block',
+          ignoreClass: 'session-replay-ignore',
+          recordCanvas: false,
+          inlineStylesheet: false,
+          collectFonts: false
+        });
+        if (!stop) {
+          console.error('[SessionReplay] The recorder did not start.');
           return;
         }
-        if (count >= MAX_EVENTS) return;
-        count++;
-        pending.push(sanitizeReplayEvent(event));
-        if (pending.length >= 40) void flush();
-      },
-      maskAllInputs: true,
-      maskTextSelector: '*',
-      blockClass: 'session-replay-block',
-      ignoreClass: 'session-replay-ignore',
-      recordCanvas: false,
-      inlineStylesheet: false,
-      collectFonts: false
-    });
-    if (!stop) {
-      console.error('[SessionReplay] The recorder did not start.');
-      return;
+        interval = setInterval(() => void flush(), 5000);
+      } catch (error) {
+        console.error('[SessionReplay] Could not start the recorder:', error);
+      }
     }
-    const interval = setInterval(() => void flush(), 5000);
+    void startRecording();
     const onConsentChange = () => {
       if (!consentEnabled()) {
         stopped = true;
-        stop();
+        stop?.();
+        if (interval) clearInterval(interval);
         void flush();
       }
     };
@@ -190,8 +201,8 @@ export default function SessionReplay() {
 
     return () => {
       stopped = true;
-      stop();
-      clearInterval(interval);
+      stop?.();
+      if (interval) clearInterval(interval);
       if (retryTimer) clearTimeout(retryTimer);
       window.removeEventListener('ob-consent-updated', onConsentChange);
       void flush();
