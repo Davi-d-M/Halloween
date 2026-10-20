@@ -185,17 +185,18 @@
   background: rgb(36 23 46 / 96%);
   border: 1px solid rgb(235 203 152 / 35%);
   border-radius: 18px;
+  box-sizing: border-box;
   bottom: max(14px, env(safe-area-inset-bottom));
   box-shadow: 0 14px 40px rgb(20 13 27 / 28%);
   color: #fff9ef;
   display: flex;
   gap: 12px;
   left: 50%;
-  max-width: min(640px, calc(100vw - 32px));
+  max-width: min(640px, calc(100vw - 20px));
   padding: 10px 12px;
   position: fixed;
   transform: translateX(-50%);
-  width: max-content;
+  width: min(640px, calc(100vw - 20px));
   z-index: 70;
 }
 
@@ -1471,28 +1472,33 @@
 
   .mm-music-player {
     bottom: max(68px, calc(env(safe-area-inset-bottom) + 64px));
-    gap: 8px;
+    gap: 6px;
     max-width: calc(100vw - 20px);
-    padding: 8px;
+    padding: 6px;
     width: calc(100vw - 20px);
+  }
+
+  .mm-music-player-brand {
+    flex-basis: 30px;
+    height: 30px;
   }
 
   .mm-music-player-info {
     flex: 1 1 auto;
-    min-width: 70px;
+    min-width: 58px;
   }
 
   .mm-music-player-info strong {
-    max-width: 120px;
+    max-width: 100px;
   }
 
   .mm-music-track-select select {
-    max-width: min(38vw, 160px);
+    max-width: min(34vw, 140px);
     padding-left: 9px;
   }
 
   .mm-music-play {
-    padding: 0 10px;
+    padding: 0 8px;
   }
 
   .mm-music-player-error {
