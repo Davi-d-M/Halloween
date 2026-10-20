@@ -39,6 +39,26 @@ type Catalog = {
   pagination?: { page: number; pageSize: number; total: number; hasMore: boolean };
 };
 
+type FitStudioOffering = {
+  id: string;
+  service_key: string;
+  title: string;
+  description: string;
+  image_url: string | null;
+  price_kes: number | null;
+};
+
+const fitStudioServiceLabels: Record<string, string> = {
+  finding_outfit: 'Outfits',
+  styling: 'Styling',
+  makeup_sfx: 'Makeup & effects',
+  wig_hair: 'Wigs & hair',
+  props_accessories: 'Props & accessories',
+  tailoring: 'Tailoring',
+  costume_maker: 'Costumes',
+  inspiration_tutorials: 'Inspiration'
+};
+
 type OfferThread = {
   id: string;
   status: string;
@@ -177,6 +197,78 @@ function ProductGrid({ products, emptyMessage }: { products: Product[]; emptyMes
         );
       })}
     </div>
+  );
+}
+
+function FitStudioEditSection() {
+  const [offerings, setOfferings] = useState<FitStudioOffering[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/market/fit-studio-offerings', {
+      cache: 'no-store',
+      signal: controller.signal
+    })
+      .then(async (response) => {
+        const result = await response.json() as { offerings?: FitStudioOffering[]; error?: string };
+        if (!response.ok) throw new Error(result.error || 'Halloween picks could not be loaded.');
+        if (!Array.isArray(result.offerings)) throw new Error('Halloween picks returned an invalid response.');
+        setOfferings(result.offerings);
+      })
+      .catch((cause: unknown) => {
+        if (cause instanceof Error && cause.name === 'AbortError') return;
+        setError(cause instanceof Error ? cause.message : 'Halloween picks could not be loaded.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  if (!loading && !error && offerings.length === 0) return null;
+
+  return (
+    <section className="mm-fit-edit" aria-labelledby="fit-edit-heading">
+      <div className="mm-section-heading">
+        <div>
+          <div className="mm-eyebrow">Curated by Midnight Society</div>
+          <h2 id="fit-edit-heading">Halloween finds &amp; finishing touches</h2>
+          <p className="mm-fit-edit-intro">Admin-published outfits, wigs and accessories from the Fit Studio edit.</p>
+        </div>
+      </div>
+      {error
+        ? <div className="mm-state mm-error" role="alert">{error}</div>
+        : loading
+          ? <div className="mm-state" role="status">Loading Halloween finds…</div>
+          : <div className="mm-fit-edit-grid">
+            {offerings.map((offering) => (
+              <article className="mm-fit-edit-card" key={offering.id}>
+                <div className="mm-fit-edit-image">
+                  {offering.image_url
+                    ? <Image src={offering.image_url} alt={offering.title} fill unoptimized sizes="(max-width: 800px) 50vw, 25vw" />
+                    : <MoonStar aria-hidden="true" size={38} strokeWidth={1} />}
+                  <span className="mm-fit-edit-category">{fitStudioServiceLabels[offering.service_key] || 'Halloween style'}</span>
+                </div>
+                <h3>{offering.title}</h3>
+                {offering.description && <p>{offering.description}</p>}
+                <div className="mm-fit-edit-price">
+                  {offering.price_kes === null
+                    ? 'Ask for a quote'
+                    : new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(offering.price_kes)}
+                </div>
+              </article>
+            ))}
+          </div>}
+      <p className="mm-fit-edit-note">
+        These are request listings, not confirmed stock or online checkout. Waitlist members can ask about a find through Fit Studio.
+      </p>
+      <a className="mm-button mm-button-secondary" href="https://theewaitlist.vercel.app/fit-studio">
+        Explore member requests <ArrowRight size={15} />
+      </a>
+    </section>
   );
 }
 
@@ -653,6 +745,8 @@ export function MarketHomePage() {
           </div>
           <div className="mm-hero-art" aria-hidden="true">✳</div>
         </section>
+
+        <FitStudioEditSection />
 
         <section id="categories">
           <div className="mm-section-heading">
