@@ -47,6 +47,7 @@ type FitStudioOffering = {
   description: string;
   image_url: string | null;
   price_kes: number | null;
+  available: boolean;
 };
 
 const fitStudioServiceLabels: Record<string, string> = {
@@ -348,6 +349,9 @@ function FitStudioEditSection() {
                     ? 'Ask for a quote'
                     : new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(offering.price_kes)}
                 </div>
+                <p className="mm-fit-edit-availability" data-available={offering.available}>
+                  {offering.available ? 'Available for requests' : 'Currently unavailable'}
+                </p>
               </article>
             ))}
           </div>}

@@ -728,6 +728,17 @@
   margin-top: 8px;
 }
 
+.mm-fit-edit-availability {
+  color: var(--mm-muted);
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.mm-fit-edit-availability[data-available="true"] {
+  color: #287451;
+}
+
 .mm-fit-edit-note {
   margin-top: 20px;
 }

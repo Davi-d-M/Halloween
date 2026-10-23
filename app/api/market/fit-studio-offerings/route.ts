@@ -28,9 +28,8 @@ export async function GET() {
   while (true) {
     const { data, error } = await database
       .from('fit_service_offerings')
-      .select('id, service_key, title, description, image_url, price_kes')
+      .select('id, service_key, title, description, image_url, price_kes, available')
       .eq('published', true)
-      .eq('available', true)
       .order('updated_at', { ascending: false })
       .range(from, from + pageSize - 1);
 
