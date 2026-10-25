@@ -3,6 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+const defaultStorefront = {
+  eyebrow: 'HALLOWEEN DROP',
+  title: 'COSTUME STORE FOR THE SEASON',
+  subtitle: 'Browse costume drops, explore fit and photo previews, and discover real merchant listings when they’re published.',
+  collectionEyebrow: 'THE COLLECTION',
+  collectionTitle: 'Find your look.',
+  searchPlaceholder: 'Search costumes, styles, and descriptions',
+  categoriesLabel: 'SHOP LIVE CATEGORIES',
+  countdownLabel: 'HALLOWEEN COUNTDOWN',
+  countdownEndsAt: null,
+  showPreviewDesigns: true
+};
+
 type CatalogProduct = {
   id: string;
   name: string;
@@ -97,14 +110,38 @@ export async function GET(request: Request) {
       return query;
     })(),
     database.from('mm_market_campaigns')
-      .select('title, message')
+      .select('title, message, published, storefront_eyebrow, storefront_title, storefront_subtitle, collection_eyebrow, collection_title, search_placeholder, categories_label, countdown_label, countdown_ends_at, show_preview_designs')
       .eq('campaign_key', 'market')
-      .eq('published', true)
       .maybeSingle()
   ]);
 
-  if (categoriesError || productsResult.error || campaignResult.error) {
-    const error = categoriesError || productsResult.error || campaignResult.error;
+  let campaign = campaignResult.data;
+  let storefront = campaign ? {
+    eyebrow: campaign.storefront_eyebrow,
+    title: campaign.storefront_title,
+    subtitle: campaign.storefront_subtitle,
+    collectionEyebrow: campaign.collection_eyebrow,
+    collectionTitle: campaign.collection_title,
+    searchPlaceholder: campaign.search_placeholder,
+    categoriesLabel: campaign.categories_label,
+    countdownLabel: campaign.countdown_label,
+    countdownEndsAt: campaign.countdown_ends_at,
+    showPreviewDesigns: campaign.show_preview_designs
+  } : null;
+  let campaignError = campaignResult.error;
+  if (campaignError && ['42703', 'PGRST204'].includes(campaignError.code || '')) {
+    console.warn('[MidnightMarket] Storefront controls migration is not applied yet; serving default shop settings.');
+    const legacyCampaign = await database.from('mm_market_campaigns')
+      .select('title, message, published')
+      .eq('campaign_key', 'market')
+      .maybeSingle();
+    campaignError = legacyCampaign.error;
+    campaign = legacyCampaign.data as typeof campaign;
+    storefront = legacyCampaign.data ? defaultStorefront : null;
+  }
+
+  if (categoriesError || productsResult.error || campaignError) {
+    const error = categoriesError || productsResult.error || campaignError;
     console.error('[MidnightMarket] Could not load catalog:', error);
     return NextResponse.json({ error: 'The Midnight Market catalog could not be loaded.' }, { status: 503 });
   }
@@ -164,9 +201,12 @@ export async function GET(request: Request) {
   return NextResponse.json({
     categories: categories || [],
     products,
-    campaign: campaignResult.data,
+    campaign: campaign?.published
+      ? { title: campaign.title, message: campaign.message }
+      : null,
+    storefront,
     pagination: { page, pageSize, total, hasMore: page * pageSize < total }
   }, {
-    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
+    headers: { 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=60' }
   });
 }
